@@ -27,18 +27,6 @@ No Windows com política restritiva do PowerShell, use `npm.cmd start` ou abra `
 
 Tudo fica no armazenamento local do navegador. Apenas o módulo de notícias faz uma consulta pública ao GDELT; suas tarefas, hábitos e diário não são enviados pelo MindFlow.
 
-## Publicar no GitHub
-
-```bash
-git init -b main
-git add .
-git commit -m "feat: first MindFlow release"
-git remote add origin https://github.com/SEU-USUARIO/mindflow.git
-git push -u origin main
-```
-
-Antes do `push`, crie um repositório vazio chamado `mindflow` no GitHub. Não inclua backups ou dados pessoais.
-
 ## Desenvolvimento
 
 ```bash
