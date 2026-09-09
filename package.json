@@ -1,0 +1,13 @@
+{
+  "name": "mindflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Um sistema pessoal local para hábitos, planejamento e foco.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check app.js && node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

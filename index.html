@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f766e" />
+    <title>MindFlow</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegação principal">
+        <a class="brand" href="#inicio" data-route="inicio" aria-label="MindFlow, início">
+          <span class="brand-mark">M</span><span>MindFlow</span>
+        </a>
+        <nav class="nav-list">
+          <button class="nav-item active" data-route="inicio"><span>⌂</span> Início</button>
+          <button class="nav-item" data-route="hoje"><span>✓</span> Hoje</button>
+          <button class="nav-item" data-route="planejamento"><span>☷</span> Planejamento</button>
+          <button class="nav-item" data-route="kanban"><span>▦</span> Kanban</button>
+          <button class="nav-item" data-route="biblioteca"><span>⌘</span> Aprendizado</button>
+          <button class="nav-item" data-route="foco"><span>◷</span> Foco</button>
+          <button class="nav-item" data-route="visao"><span>✦</span> Visão</button>
+        </nav>
+        <div class="sidebar-footer">
+          <p>Seu sistema pessoal,<br />um dia por vez.</p>
+          <button class="quiet-button" id="export-data">↓ Exportar dados</button>
+          <label class="quiet-button import-label" for="import-data">↑ Importar backup</label>
+          <input id="import-data" type="file" accept="application/json" hidden />
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu">☰</button>
+          <div class="topbar-title">
+            <p class="eyebrow" id="page-kicker">SISTEMA PESSOAL</p>
+            <h1 id="page-title">Seu espaço está pronto.</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="capture-button" id="open-capture" aria-label="Capturar tarefa rapidamente">+ <span>Capturar</span></button>
+            <button class="theme-toggle" id="theme-toggle" aria-label="Ativar modo escuro" title="Alternar tema"><span id="theme-icon">☾</span></button>
+            <button class="profile-button" id="profile-button" aria-label="Definir seu nome" title="Definir seu nome"><span id="profile-initial" aria-hidden="true">•</span></button>
+            <div class="date-display" id="date-display"></div>
+          </div>
+        </header>
+
+        <section class="view active" id="inicio" data-title="Seu espaço está pronto." data-kicker="SISTEMA PESSOAL">
+          <div class="hero-grid">
+            <article class="hero-copy card">
+              <p class="section-label">DIREÇÃO DO DIA</p>
+              <h2>Faça o próximo passo importar.</h2>
+              <p>Onde o foco vai, a energia flui. Escolha uma prioridade e avance nela antes do ruído.</p>
+              <button class="primary-button" data-route="hoje">Abrir meu dia <span>→</span></button>
+            </article>
+            <article class="daily-score card">
+              <p class="section-label">CONSISTÊNCIA DE HOJE</p>
+              <div class="score-row"><strong id="home-score">0%</strong><span id="home-score-label">comece por um hábito</span></div>
+              <div class="progress-track"><span id="home-progress"></span></div>
+              <div class="score-meta"><span id="home-habits">0 / 10 hábitos</span><button class="text-button" data-route="hoje">Ver detalhes</button></div>
+            </article>
+          </div>
+
+          <div class="metrics-grid">
+            <article class="metric-card card"><span class="metric-icon teal">✓</span><div><p>Hábitos</p><strong id="metric-habits">0/10</strong><small>concluídos hoje</small></div></article>
+            <article class="metric-card card"><span class="metric-icon orange">▣</span><div><p>Em andamento</p><strong id="metric-doing">0</strong><small>limite sugerido: 2</small></div></article>
+            <article class="metric-card card"><span class="metric-icon purple">◷</span><div><p>Foco</p><strong id="metric-focus">0 min</strong><small>registrados hoje</small></div></article>
+            <article class="metric-card card"><span class="metric-icon yellow">⌘</span><div><p>Aprendizado</p><strong id="metric-learning">0</strong><small>itens em progresso</small></div></article>
+          </div>
+
+          <div class="two-column">
+            <article class="card priorities-card">
+              <div class="section-heading"><div><p class="section-label">AGORA</p><h2>Próximas prioridades</h2></div><button class="text-button" data-route="kanban">Ver kanban →</button></div>
+              <div id="priority-list" class="priority-list"></div>
+            </article>
+            <article class="card news-card">
+              <div class="section-heading"><div><p class="section-label">ATUALIZAÇÕES DO DIA</p><h2>Notícias relevantes</h2></div><button class="icon-button" id="refresh-news" aria-label="Atualizar notícias" title="Atualizar notícias">↻</button></div>
+              <div class="news-controls"><label for="news-topic">Tema</label><select id="news-topic"><option value="brazil">Brasil</option><option value="technology">Tecnologia</option><option value="business">Economia</option><option value="world">Mundo</option></select><span id="news-status" aria-live="polite"></span></div>
+              <div id="news-list" class="news-list" aria-live="polite"></div>
+              <p class="news-source">Fonte: GDELT · links abrem no veículo original.</p>
+            </article>
+          </div>
+
+          <article class="card updates-card">
+            <div class="section-heading"><div><p class="section-label">EVOLUÇÃO DO SISTEMA</p><h2>Minhas atualizações</h2></div><button class="icon-button" id="add-update" aria-label="Adicionar atualização">+</button></div>
+            <div id="updates-list" class="updates-list"></div>
+          </article>
+
+          <article class="card starter-card">
+            <div><p class="section-label">COMECE SEM EXCESSO</p><h2>Três passos para hoje</h2><p>O template vem limpo. Use estes exemplos como ponto de partida e adapte tudo ao seu ritmo.</p></div>
+            <ol><li><strong>Edite os três hábitos de exemplo</strong><span>Deixe apenas o que você realmente quer repetir.</span></li><li><strong>Capture uma tarefa</strong><span>Ela entra no Backlog e pode virar sua próxima ação.</span></li><li><strong>Abra um ciclo de foco</strong><span>O timer acompanha você sem ocupar a tela inteira.</span></li></ol>
+          </article>
+        </section>
+
+        <section class="view" id="hoje" data-title="Meu dia" data-kicker="O QUE IMPORTA AGORA">
+          <article class="today-hero card">
+            <div>
+              <p class="section-label">MEU DIA · <span id="today-date"></span></p>
+              <h2 id="today-next-title">Escolha a próxima ação.</h2>
+              <p id="today-next-note">Um dia produtivo começa com uma decisão simples.</p>
+            </div>
+            <div class="today-hero-actions">
+              <div class="today-total"><strong id="today-score">0%</strong><span>hábitos</span></div>
+              <button class="primary-button" id="today-start-focus">Iniciar foco →</button>
+            </div>
+          </article>
+
+          <article class="card habits-card today-habits-card">
+            <div class="section-heading"><div><p class="section-label">ESSENCIAL</p><h2>Hábitos de hoje</h2><p>Marque o que aconteceu. O resto pode esperar.</p></div><div class="habit-actions"><button class="text-button" id="open-habit-manager">Editar hábitos</button><button class="text-button subtle-action" id="reset-habits">Limpar dia</button></div></div>
+            <div class="today-habit-progress"><span id="today-habit-progress-text">0 de 0 concluídos</span><div class="progress-track"><span id="today-habit-progress"></span></div></div>
+            <div id="habits-list" class="habits-list"></div>
+          </article>
+
+          <details class="today-details card" id="wellbeing-details">
+            <summary><span><strong>Check-in rápido</strong><small>Humor, sono, água e horário</small></span><span class="details-chevron">⌄</span></summary>
+            <div class="details-content"><div class="form-grid compact">
+              <label>Humor<select id="mood-input"><option value="normal">Normal</option><option value="feliz">Feliz</option><option value="produtivo">Produtivo</option><option value="cansado">Cansado</option><option value="ansioso">Ansioso</option></select></label>
+              <label>Sono<select id="sleep-input"><option value="bom">Bom</option><option value="muito bom">Muito bom</option><option value="mais ou menos">Mais ou menos</option><option value="ruim">Ruim</option></select></label>
+              <label>Acordei às<input id="wake-input" type="time" /></label>
+              <label>Água (L)<input id="water-input" type="number" min="0" max="8" step="0.5" placeholder="0" /></label>
+            </div></div>
+          </details>
+
+          <details class="today-details card" id="journal-details">
+            <summary><span><strong>Diário de bordo</strong><small>Refletir e preparar amanhã</small></span><span class="save-status" id="journal-status">salvo automaticamente</span><span class="details-chevron">⌄</span></summary>
+            <div class="details-content journal-grid">
+              <label>O que fiz hoje<textarea id="journal-did" placeholder="Manhã, tarde e noite..."></textarea></label>
+              <label>Conquistas<textarea id="journal-wins" placeholder="O que deu certo?"></textarea></label>
+              <label>O que posso melhorar<textarea id="journal-improve" placeholder="Ajustes para amanhã..."></textarea></label>
+              <label>Reflexão<textarea id="journal-reflection" placeholder="Como me senti? O que aprendi?"></textarea></label>
+              <label class="journal-wide">Plano para amanhã<textarea id="journal-tomorrow" placeholder="Defina até três prioridades concretas."></textarea></label>
+            </div>
+          </details>
+        </section>
+
+        <section class="view" id="planejamento" data-title="Planejamento diário" data-kicker="CLAREZA ANTES DA AÇÃO">
+          <div class="section-heading planning-intro"><div><p class="section-label">PLANEJE O EXECUTÁVEL</p><h2>O que precisa acontecer?</h2><p>Use prioridade para decidir; use o kanban para executar.</p></div><button class="primary-button" id="open-task-form">+ Nova tarefa</button></div>
+          <div class="planning-grid">
+            <article class="card planner-list-card"><div class="section-heading"><h2>Lista do dia</h2><select id="task-filter" aria-label="Filtrar tarefas"><option value="all">Todas</option><option value="work">Trabalho</option><option value="personal">Pessoal</option></select></div><div id="planner-list" class="planner-list"></div></article>
+            <aside class="card framework-card"><p class="section-label">REGRA SIMPLES</p><h3>Planeje em 3 níveis</h3><ol><li><strong>1 prioridade</strong> que move sua semana.</li><li><strong>3 tarefas</strong> possíveis para hoje.</li><li><strong>Blocos de foco</strong> protegidos no calendário.</li></ol><p class="framework-note">Não é sobre preencher a lista. É sobre terminar o que importa.</p></aside>
+          </div>
+        </section>
+
+        <section class="view" id="kanban" data-title="Kanban pessoal" data-kicker="FLUXO DE TRABALHO">
+          <div class="section-heading kanban-heading"><div><p class="section-label">VISUALIZE, LIMITE, FINALIZE</p><h2>Um sistema para trabalho e vida pessoal</h2><p>Arraste os cartões entre as colunas. Mantenha no máximo 2 itens em andamento.</p></div><button class="primary-button" id="open-kanban-form">+ Adicionar cartão</button></div>
+          <div class="kanban-board" id="kanban-board">
+            <section class="kanban-column" data-status="backlog"><div class="column-head"><span class="status-dot slate"></span><h3>Backlog</h3><span class="count" id="count-backlog">0</span></div><div class="drop-zone" data-status="backlog"></div></section>
+            <section class="kanban-column" data-status="next"><div class="column-head"><span class="status-dot blue"></span><h3>Próxima</h3><span class="count" id="count-next">0</span></div><div class="drop-zone" data-status="next"></div></section>
+            <section class="kanban-column" data-status="doing"><div class="column-head"><span class="status-dot amber"></span><h3>Em andamento</h3><span class="wip">WIP 2</span><span class="count" id="count-doing">0</span></div><div class="drop-zone" data-status="doing"></div></section>
+            <section class="kanban-column" data-status="done"><div class="column-head"><span class="status-dot green"></span><h3>Concluído</h3><span class="count" id="count-done">0</span></div><div class="drop-zone" data-status="done"></div></section>
+          </div>
+        </section>
+
+        <section class="view" id="biblioteca" data-title="Aprendizado" data-kicker="LEITURA E CURSOS">
+          <div class="section-heading"><div><p class="section-label">CONHECIMENTO EM MOVIMENTO</p><h2>Construa seu repertório</h2></div><button class="primary-button" id="open-learning-form">+ Adicionar item</button></div>
+          <div class="library-tabs" role="tablist"><button class="library-tab active" data-library="reading">Leitura</button><button class="library-tab" data-library="course">Cursos</button></div>
+          <div class="library-grid" id="library-list"></div>
+        </section>
+
+        <section class="view" id="foco" data-title="Foco" data-kicker="PRESENÇA INTENCIONAL">
+          <div class="focus-layout">
+            <article class="timer-card card">
+              <p class="section-label">POMODORO</p><h2 id="timer-mode">Hora de focar</h2>
+              <div class="timer" id="timer-display">25:00</div>
+              <div class="timer-controls"><button class="primary-button" id="timer-start">Começar</button><button class="secondary-button" id="timer-reset">Reiniciar</button></div>
+              <div class="focus-presets"><button data-minutes="25" class="active">25 min</button><button data-minutes="50">50 min</button><button data-minutes="5">5 min pausa</button></div>
+              <p class="focus-log">Hoje: <strong id="focus-minutes">0 min</strong> de foco registrado</p>
+            </article>
+            <article class="card focus-ritual"><p class="section-label">ANTES DE COMEÇAR</p><h2>Crie o ambiente</h2><label class="ritual-item"><input type="checkbox" data-ritual="tabs" /> Só abas relacionadas à tarefa</label><label class="ritual-item"><input type="checkbox" data-ritual="phone" /> Celular fora do alcance</label><label class="ritual-item"><input type="checkbox" data-ritual="water" /> Água por perto</label><label class="ritual-item"><input type="checkbox" data-ritual="defined" /> Próxima ação definida</label><div class="focus-task"><label for="focus-task-input">No que vou focar?</label><input id="focus-task-input" placeholder="Ex.: concluir a proposta" /></div><button class="secondary-button popout-button" id="popout-timer">↗ Abrir mini janela</button><p class="support-note">Funciona em navegadores compatíveis; o timer flutuante da página continua disponível em todos.</p></article>
+          </div>
+        </section>
+
+        <section class="view" id="visao" data-title="Visão e direção" data-kicker="O LONGO PRAZO GUIA O DIA">
+          <div class="vision-intro"><p class="section-label">QUADRO DOS SONHOS</p><h2>Não são desejos soltos.<br />São direções que merecem espaço.</h2></div>
+          <div class="dream-grid" id="dream-grid"></div>
+          <article class="card ikigai-card"><div><p class="section-label">IKIGAI</p><h2>Minha razão de ser</h2><p>Aproxime paixão, missão, vocação e profissão — sem exigir uma resposta perfeita.</p></div><div class="ikigai-fields"><label>O que eu amo?<textarea data-ikigai="love" placeholder="Paixão"></textarea></label><label>O que o mundo precisa?<textarea data-ikigai="mission" placeholder="Missão"></textarea></label><label>No que sou bom?<textarea data-ikigai="vocation" placeholder="Vocação"></textarea></label><label>Pelo que posso ser pago?<textarea data-ikigai="profession" placeholder="Profissão"></textarea></label><label class="ikigai-wide">Minha intersecção hoje<textarea data-ikigai="answer" placeholder="Meu Ikigai, em construção..."></textarea></label></div></article>
+        </section>
+      </main>
+    </div>
+
+    <aside id="floating-timer" class="floating-timer" hidden aria-live="polite">
+      <button class="floating-close" id="hide-floating-timer" aria-label="Ocultar timer">×</button>
+      <span class="floating-label" id="floating-timer-label">FOCO EM ANDAMENTO</span>
+      <strong id="floating-timer-display">25:00</strong>
+      <div><button class="floating-action" id="floating-timer-toggle">Pausar</button><button class="floating-open" id="floating-timer-open">Abrir foco ↗</button></div>
+    </aside>
+
+    <dialog id="profile-dialog" class="modal small-modal" aria-labelledby="profile-dialog-title">
+      <form id="profile-form">
+        <div class="modal-header"><div><p class="section-label" id="profile-dialog-kicker">BEM-VINDO</p><h2 id="profile-dialog-title">Bem-vindo ao MindFlow</h2><p id="profile-dialog-copy">Informe seu nome para personalizar as saudações. Ele fica salvo somente neste navegador.</p></div></div>
+        <label for="profile-name-input">Como podemos chamar você?<input id="profile-name-input" name="name" autocomplete="given-name" maxlength="48" required placeholder="Seu nome" /></label>
+        <p class="modal-hint">Sem senha, conta ou envio de dados.</p>
+        <div class="modal-actions"><button type="button" id="profile-cancel" class="secondary-button" hidden>Cancelar</button><button id="profile-submit" class="primary-button">Entrar no meu espaço</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="task-dialog" class="modal"><form method="dialog" id="task-form"><div class="modal-header"><div><p class="section-label">NOVA TAREFA</p><h2>Transforme intenção em próximo passo</h2></div><button type="button" class="icon-button" data-close aria-label="Fechar">×</button></div><label>Título<input id="task-title-input" required placeholder="Ex.: revisar entrega do trabalho" /></label><div class="form-grid"><label>Área<select id="task-area-input"><option value="work">Trabalho</option><option value="personal">Pessoal</option></select></label><label>Prioridade<select id="task-priority-input"><option value="high">Prioridade</option><option value="medium">Importante</option><option value="low">Quando der</option></select></label><label>Status<select id="task-status-input"><option value="backlog">Backlog</option><option value="next">Próxima</option><option value="doing">Em andamento</option></select></label><label>Data<input id="task-date-input" type="date" /></label></div><label>Próxima ação (opcional)<textarea id="task-note-input" placeholder="Deixe claro o que significa começar."></textarea></label><div class="modal-actions"><button type="button" data-close class="secondary-button">Cancelar</button><button class="primary-button" value="default">Adicionar tarefa</button></div></form></dialog>
+
+    <dialog id="learning-dialog" class="modal"><form method="dialog" id="learning-form"><div class="modal-header"><div><p class="section-label">APRENDIZADO</p><h2>Adicionar à biblioteca</h2></div><button type="button" class="icon-button" data-close aria-label="Fechar">×</button></div><label>Título<input id="learning-title-input" required placeholder="Nome do livro, curso ou artigo" /></label><div class="form-grid"><label>Tipo<select id="learning-type-input"><option value="reading">Leitura</option><option value="course">Curso</option></select></label><label>Autor / plataforma<input id="learning-author-input" placeholder="Opcional" /></label><label>Unidade total<input id="learning-total-input" type="number" min="1" placeholder="Páginas ou horas" /></label><label>Unidade atual<input id="learning-current-input" type="number" min="0" placeholder="0" /></label></div><div class="modal-actions"><button type="button" data-close class="secondary-button">Cancelar</button><button class="primary-button" value="default">Salvar item</button></div></form></dialog>
+
+    <dialog id="update-dialog" class="modal small-modal"><form method="dialog" id="update-form"><div class="modal-header"><div><p class="section-label">ATUALIZAÇÃO</p><h2>Registrar uma nota</h2></div><button type="button" class="icon-button" data-close aria-label="Fechar">×</button></div><label>O que mudou?<textarea id="update-text-input" required placeholder="Uma ideia, uma melhoria ou um lembrete..."></textarea></label><div class="modal-actions"><button type="button" data-close class="secondary-button">Cancelar</button><button class="primary-button" value="default">Adicionar</button></div></form></dialog>
+
+    <dialog id="capture-dialog" class="modal small-modal"><form method="dialog" id="capture-form"><div class="modal-header"><div><p class="section-label">CAPTURA RÁPIDA</p><h2>Tire da cabeça</h2></div><button type="button" class="icon-button" data-close aria-label="Fechar">×</button></div><label>O que você não quer esquecer?<input id="capture-input" required placeholder="Ex.: ligar para o fornecedor" /></label><p class="modal-hint">Vai para o Backlog. Você decide a prioridade depois.</p><div class="modal-actions"><button type="button" data-close class="secondary-button">Cancelar</button><button class="primary-button" value="default">Capturar</button></div></form></dialog>
+
+    <dialog id="habit-dialog" class="modal habit-modal"><div class="modal-header"><div><p class="section-label">MEUS HÁBITOS</p><h2>Ajuste o que faz sentido agora</h2><p>Arquivar mantém seu histórico, mas tira o hábito da lista de hoje.</p></div><button type="button" class="icon-button" data-close aria-label="Fechar">×</button></div><div id="habit-manager-list" class="habit-manager-list"></div><form id="add-habit-form" class="add-habit-form"><label>Novo hábito<input id="new-habit-title" required placeholder="Ex.: Caminhar 15 minutos" /></label><label>Gatilho (opcional)<input id="new-habit-cue" placeholder="Ex.: depois do almoço" /></label><button class="secondary-button">+ Adicionar</button></form><div class="modal-actions"><button type="button" data-close class="primary-button">Concluir</button></div></dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Editor e logs locais
+.idea/
+*.log
+
+# Dados e backups pessoais
+mindflow-backup-*.json
+*.local.json
+.env
