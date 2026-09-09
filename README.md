@@ -1,7 +1,5 @@
 # MindFlow
 
-> Menos ruído. Mais presença.
-
 Um espaço pessoal para organizar o dia, manter hábitos e entrar em foco — local, privado e sem conta.
 
 ## Inclui
