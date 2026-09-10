@@ -38,6 +38,74 @@ const todayHabits = () => state.habits[DATE_KEY] || {};
 const progress = (current, total) => total ? Math.min(100, Math.round((Number(current) / Number(total)) * 100)) : 0;
 const asText = (value, fallback = '') => typeof value === 'string' ? value : fallback;
 
+function recentDateKeys(count = 7) {
+  const current = new Date();
+  current.setHours(12, 0, 0, 0);
+  return Array.from({ length: count }, (_, index) => {
+    const day = new Date(current);
+    day.setDate(day.getDate() - index);
+    return day.toLocaleDateString('en-CA');
+  });
+}
+
+function isDateKey(value) { return /^\d{4}-\d{2}-\d{2}$/.test(value); }
+
+function dateFromKey(key) {
+  const date = new Date(`${key}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatHistoryDate(key, options = { weekday: 'long', day: 'numeric', month: 'long' }) {
+  const date = dateFromKey(key);
+  return date ? new Intl.DateTimeFormat('pt-BR', options).format(date).replace(/^./, char => char.toUpperCase()) : key;
+}
+
+function formatHistoryWeekday(key) {
+  return formatHistoryDate(key, { weekday: 'short' }).replace('.', '').slice(0, 3);
+}
+
+function recordedDayKeys() {
+  const dates = new Set();
+  [state.habits, state.journal, state.checkin, state.focusMinutes].forEach(source => {
+    Object.keys(source || {}).filter(isDateKey).forEach(day => dates.add(day));
+  });
+  return dates;
+}
+
+function hasDayData(day) {
+  const habitValues = state.habits[day] || {};
+  const journal = state.journal[day] || {};
+  const checkin = state.checkin[day] || {};
+  return Object.keys(habitValues).length > 0
+    || Object.values(journal).some(value => String(value || '').trim())
+    || Object.values(checkin).some(Boolean)
+    || Number(state.focusMinutes[day]) > 0;
+}
+
+function daySummary(day) {
+  const habits = activeHabits();
+  const values = state.habits[day] || {};
+  const completed = habits.filter(habit => values[habit.id]).length;
+  const total = habits.length;
+  return {
+    day,
+    habits,
+    values,
+    completed,
+    total,
+    percentage: total ? Math.round((completed / total) * 100) : 0,
+    journal: state.journal[day] || {},
+    checkin: state.checkin[day] || {},
+    focus: Number(state.focusMinutes[day]) || 0,
+    hasData: hasDayData(day)
+  };
+}
+
+function historyDateKeys(limit = 28) {
+  const dates = new Set([...recentDateKeys(limit), ...recordedDayKeys()]);
+  return [...dates].sort((first, second) => second.localeCompare(first)).slice(0, limit);
+}
+
 function normalizeTask(task = {}) {
   const source = task && typeof task === 'object' ? task : {};
   const status = STATUS[source.status] ? source.status : 'backlog';
@@ -114,6 +182,7 @@ let timerPreset = 25;
 let timerRunning = false;
 let pipWindow = null;
 let newsRequest = null;
+let selectedHistoryDate = DATE_KEY;
 
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
@@ -201,7 +270,7 @@ function renderHabits() {
   $$('[data-habit-id]').forEach(input => input.addEventListener('change', event => {
     const id = event.target.dataset.habitId;
     state.habits[DATE_KEY] = { ...todayHabits(), [id]: event.target.checked };
-    save(); renderHabits(); updateSummary();
+    save(); renderHabits(); renderHistoryPreview(); renderHistory(); updateSummary();
   }));
 }
 
@@ -217,14 +286,14 @@ function renderJournalAndCheckin() {
   Object.entries(journalFields).forEach(([selector, key]) => {
     $(selector).oninput = event => {
       state.journal[DATE_KEY] = { ...(state.journal[DATE_KEY] || {}), [key]: event.target.value };
-      save();
+      save(); renderHistoryPreview(); renderHistory();
       const status = $('#journal-status'); status.textContent = 'salvo agora';
       clearTimeout(renderJournalAndCheckin.timer);
       renderJournalAndCheckin.timer = setTimeout(() => { status.textContent = 'salvo automaticamente'; }, 1500);
     };
   });
   [['#mood-input', 'mood'], ['#sleep-input', 'sleep'], ['#wake-input', 'wake'], ['#water-input', 'water']].forEach(([selector, key]) => {
-    $(selector).onchange = event => { state.checkin[DATE_KEY] = { ...(state.checkin[DATE_KEY] || {}), [key]: event.target.value }; save(); };
+    $(selector).onchange = event => { state.checkin[DATE_KEY] = { ...(state.checkin[DATE_KEY] || {}), [key]: event.target.value }; save(); renderHistoryPreview(); renderHistory(); };
   });
 }
 
@@ -392,7 +461,7 @@ function completeTimer() {
   clearInterval(timerInterval); timerRunning = false;
   if (timerPreset > 5) {
     state.focusMinutes[DATE_KEY] = (state.focusMinutes[DATE_KEY] || 0) + timerPreset;
-    save(); updateSummary(); showToast(`${timerPreset} minutos de foco registrados. Bom trabalho.`);
+    save(); renderHistoryPreview(); renderHistory(); updateSummary(); showToast(`${timerPreset} minutos de foco registrados. Bom trabalho.`);
   } else showToast('Pausa concluída. Respire e volte com intenção.');
   timerSeconds = timerPreset * 60; updateTimerDisplay();
 }
@@ -475,8 +544,66 @@ async function loadNews({ force = false } = {}) {
   }
 }
 
+function renderHistoryPreview() {
+  const days = recentDateKeys(7).reverse().map(daySummary);
+  const recorded = days.filter(day => day.hasData);
+  const average = recorded.length ? Math.round(recorded.reduce((sum, day) => sum + day.percentage, 0) / recorded.length) : null;
+  $('#history-preview-copy').textContent = recorded.length
+    ? `${recorded.length} de 7 dias com registro · ${average}% de consistência quando você registrou.`
+    : 'Registre hábitos, foco ou uma nota para começar a enxergar seu ritmo.';
+  $('#history-week-preview').innerHTML = days.map(day => `
+    <button class="week-day ${day.hasData ? 'recorded' : ''} ${day.day === DATE_KEY ? 'today' : ''}" data-history-preview-date="${escapeHTML(day.day)}" type="button">
+      <span>${escapeHTML(formatHistoryWeekday(day.day))}</span>
+      <strong>${day.hasData ? `${day.percentage}%` : '—'}</strong>
+      <i style="--day-progress:${day.hasData ? Math.max(day.percentage, 8) : 4}%"></i>
+    </button>`).join('');
+  $$('[data-history-preview-date]').forEach(button => {
+    button.onclick = () => { selectedHistoryDate = button.dataset.historyPreviewDate; setRoute('historico'); renderHistory(); };
+  });
+}
+
+function renderHistory() {
+  const summaries = historyDateKeys().map(daySummary);
+  const lastWeek = recentDateKeys(7).map(daySummary);
+  const recordedWeek = lastWeek.filter(day => day.hasData);
+  const recordedDays = recordedDayKeys().size;
+  const average = recordedWeek.length ? Math.round(recordedWeek.reduce((sum, day) => sum + day.percentage, 0) / recordedWeek.length) : null;
+  const focus = lastWeek.reduce((sum, day) => sum + day.focus, 0);
+  if (!summaries.some(day => day.day === selectedHistoryDate)) selectedHistoryDate = DATE_KEY;
+  const selected = daySummary(selectedHistoryDate);
+  $('#history-days-count').textContent = recordedDays;
+  $('#history-week-average').textContent = average === null ? '—' : `${average}%`;
+  $('#history-week-focus').textContent = `${focus} min`;
+  $('#history-list').innerHTML = summaries.map(day => `
+    <button class="history-day ${day.day === selectedHistoryDate ? 'active' : ''} ${day.hasData ? 'recorded' : ''}" type="button" data-history-date="${escapeHTML(day.day)}">
+      <span class="history-day-date">${escapeHTML(day.day === DATE_KEY ? 'Hoje' : formatHistoryDate(day.day, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>
+      <span class="history-day-meta">${day.hasData ? `${day.completed}/${day.total} hábitos · ${day.focus} min foco` : 'Sem registro'}</span>
+      <strong>${day.hasData ? `${day.percentage}%` : '—'}</strong>
+    </button>`).join('');
+  $$('[data-history-date]').forEach(button => {
+    button.onclick = () => { selectedHistoryDate = button.dataset.historyDate; renderHistory(); };
+  });
+  const journalFields = [
+    ['O que fiz', 'did'], ['Conquistas', 'wins'], ['Ajustes', 'improve'], ['Reflexão', 'reflection'], ['Plano seguinte', 'tomorrow']
+  ].filter(([, key]) => String(selected.journal[key] || '').trim());
+  const checkinFields = [
+    selected.checkin.mood && ['Humor', selected.checkin.mood],
+    selected.checkin.sleep && ['Sono', selected.checkin.sleep],
+    selected.checkin.wake && ['Acordei', selected.checkin.wake],
+    selected.checkin.water && ['Água', `${selected.checkin.water} L`]
+  ].filter(Boolean);
+  $('#history-detail').innerHTML = `
+    <div class="history-detail-heading"><div><p class="section-label">DETALHE DO DIA</p><h2>${escapeHTML(selected.day === DATE_KEY ? 'Hoje' : formatHistoryDate(selected.day))}</h2></div><strong>${selected.hasData ? `${selected.percentage}%` : '—'}</strong></div>
+    ${selected.hasData ? `<p class="history-detail-summary">${selected.completed} de ${selected.total} hábitos concluídos · ${selected.focus} min de foco.</p>` : '<p class="history-detail-summary">Nenhum registro foi feito neste dia. Tudo bem: consistência começa com o próximo check-in.</p>'}
+    <div class="history-habit-grid">${selected.habits.map(habit => `<span class="history-habit ${selected.values[habit.id] ? 'done' : ''}">${selected.values[habit.id] ? '✓' : '–'} ${escapeHTML(habit.title)}</span>`).join('')}</div>
+    ${checkinFields.length ? `<div class="history-detail-section"><h3>Check-in</h3><dl>${checkinFields.map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl></div>` : ''}
+    ${journalFields.length ? `<div class="history-detail-section"><h3>Diário</h3>${journalFields.map(([label, key]) => `<div class="history-note"><strong>${escapeHTML(label)}</strong><p>${escapeHTML(selected.journal[key])}</p></div>`).join('')}</div>` : ''}
+    ${selected.day === DATE_KEY ? '<button class="text-button" data-route="hoje">Editar o registro de hoje →</button>' : ''}`;
+  const editTodayButton = $('[data-route="hoje"]', $('#history-detail'));
+  if (editTodayButton) editTodayButton.onclick = () => setRoute('hoje');
+}
 function renderAll() {
-  applyTheme(); renderDate(); renderProfile(); renderHabits(); renderJournalAndCheckin(); renderPriorities(); renderUpdates(); renderPlanner(); renderKanban(); renderLearning(); renderVision(); updateSummary(); bindFocus(); updateTimerDisplay();
+  applyTheme(); renderDate(); renderProfile(); renderHabits(); renderJournalAndCheckin(); renderPriorities(); renderUpdates(); renderPlanner(); renderKanban(); renderLearning(); renderVision(); renderHistoryPreview(); renderHistory(); updateSummary(); bindFocus(); updateTimerDisplay();
 }
 
 function setRoute(route) {
@@ -581,7 +708,7 @@ function bindApp() {
   $('#reset-habits').onclick = () => {
     if (!completedHabitCount()) return;
     const values = { ...todayHabits() }; activeHabits().forEach(habit => { values[habit.id] = false; });
-    state.habits[DATE_KEY] = values; save(); renderHabits(); updateSummary(); showToast('Hábitos de hoje foram limpos.');
+    state.habits[DATE_KEY] = values; save(); renderHabits(); renderHistoryPreview(); renderHistory(); updateSummary(); showToast('Hábitos de hoje foram limpos.');
   };
   $('#today-start-focus').onclick = () => { const task = getNextTask(); if (task) { state.focusTask = task.title; save(); } setRoute('foco'); $('#timer-start').focus(); };
   $('#task-filter').onchange = renderPlanner;

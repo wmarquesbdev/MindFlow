@@ -3,13 +3,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const HOST = '127.0.0.1';
-const PORT = 3000;
+const PORT = Number(process.env.MINDFLOW_PORT) || 3000;
 const ROOT = __dirname;
 const TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml'
 };
 

@@ -1,5 +1,10 @@
 # MindFlow
 
+<p align="center"><img src="assets/mindflow-icon.png" width="104" alt="Ícone do MindFlow" /></p>
+
+
+> Menos ruído. Mais presença.
+
 Um espaço pessoal para organizar o dia, manter hábitos e entrar em foco — local, privado e sem conta.
 
 ## Inclui

@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f766e" />
     <title>MindFlow</title>
+    <meta name="description" content="Um espaço pessoal para hábitos, planejamento e foco." />
+    <link rel="icon" type="image/png" href="assets/mindflow-icon.png" />
+    <link rel="apple-touch-icon" href="assets/mindflow-icon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -16,6 +20,7 @@
         <nav class="nav-list">
           <button class="nav-item active" data-route="inicio"><span>⌂</span> Início</button>
           <button class="nav-item" data-route="hoje"><span>✓</span> Hoje</button>
+          <button class="nav-item" data-route="historico"><span>▤</span> Histórico</button>
           <button class="nav-item" data-route="planejamento"><span>☷</span> Planejamento</button>
           <button class="nav-item" data-route="kanban"><span>▦</span> Kanban</button>
           <button class="nav-item" data-route="biblioteca"><span>⌘</span> Aprendizado</button>
@@ -110,6 +115,11 @@
             <div class="today-habit-progress"><span id="today-habit-progress-text">0 de 0 concluídos</span><div class="progress-track"><span id="today-habit-progress"></span></div></div>
             <div id="habits-list" class="habits-list"></div>
           </article>
+          <article class="card today-history-card">
+            <div class="section-heading"><div><p class="section-label">ÚLTIMOS 7 DIAS</p><h2>Seu ritmo recente</h2><p id="history-preview-copy">Registre um pouco por dia para enxergar padrões.</p></div><button class="text-button" data-route="historico">Ver histórico →</button></div>
+            <div id="history-week-preview" class="history-week-preview" aria-label="Resumo dos últimos sete dias"></div>
+          </article>
+
 
           <details class="today-details card" id="wellbeing-details">
             <summary><span><strong>Check-in rápido</strong><small>Humor, sono, água e horário</small></span><span class="details-chevron">⌄</span></summary>
@@ -131,6 +141,19 @@
               <label class="journal-wide">Plano para amanhã<textarea id="journal-tomorrow" placeholder="Defina até três prioridades concretas."></textarea></label>
             </div>
           </details>
+        </section>
+
+        <section class="view" id="historico" data-title="Seu histórico" data-kicker="CONTINUIDADE, NÃO PERFEIÇÃO">
+          <div class="section-heading history-intro"><div><p class="section-label">VISÃO GERAL</p><h2>Veja os dias como uma sequência</h2><p>Hábitos, foco, check-in e diário ficam reunidos para você perceber o que funcionou.</p></div><button class="secondary-button" data-route="hoje">Voltar para hoje</button></div>
+          <div class="history-metrics-grid">
+            <article class="card history-metric"><span>Dias registrados</span><strong id="history-days-count">0</strong><small>desde o início</small></article>
+            <article class="card history-metric"><span>Consistência</span><strong id="history-week-average">—</strong><small>média dos últimos 7 dias</small></article>
+            <article class="card history-metric"><span>Foco</span><strong id="history-week-focus">0 min</strong><small>nos últimos 7 dias</small></article>
+          </div>
+          <div class="history-layout">
+            <article class="card history-list-card"><div class="section-heading"><div><p class="section-label">LINHA DO TEMPO</p><h2>Últimos dias</h2></div></div><div id="history-list" class="history-list" aria-live="polite"></div></article>
+            <article class="card history-detail-card" id="history-detail" aria-live="polite"></article>
+          </div>
         </section>
 
         <section class="view" id="planejamento" data-title="Planejamento diário" data-kicker="CLAREZA ANTES DA AÇÃO">

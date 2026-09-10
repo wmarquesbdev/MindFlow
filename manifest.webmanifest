@@ -1,0 +1,10 @@
+{
+  "name": "MindFlow",
+  "short_name": "MindFlow",
+  "description": "Um espaço pessoal para hábitos, planejamento e foco.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7faf8",
+  "theme_color": "#0f766e",
+  "icons": [{ "src": "assets/mindflow-icon.png", "sizes": "1254x1254", "type": "image/png" }]
+}
