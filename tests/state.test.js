@@ -15,7 +15,7 @@ test('old data survives normalization and receives a valid local avatar', () => 
   const run = model();
   const result = run(`normalizeState({profile:{name:'Will'},tasks:[{id:'t1',title:'Entrega'}],habitDefinitions:[{id:'h1',title:'Ler'}],habits:{'2026-08-01':{h1:true}},notes:[{id:'n1',title:'Ideia',body:'Texto'}]})`);
   assert.equal(result.profile.name, 'Will');
-  assert.equal(result.profile.avatar, 'ogre');
+  assert.equal(result.profile.avatar, 'frieren');
   assert.equal(result.habits['2026-08-01'].h1, true);
   assert.equal(result.tasks[0].title, 'Entrega');
   assert.equal(result.notes[0].body, 'Texto');
@@ -36,6 +36,9 @@ test('opening an archived month does not change Today and archived records remai
 test('banner and avatar selection round-trip through JSON and no-banner remains empty', () => {
   const run = model();
   assert.equal(run("normalizeState({profile:{name:'P',avatar:'wizard'}}).profile.avatar"), 'wizard');
+  assert.equal(run("normalizeState({profile:{name:'P',avatar:'goku'}}).profile.avatar"), 'goku');
+  assert.equal(run("normalizeState({profile:{name:'P',avatar:'custom',photo:'data:image/png;base64,YWJj'}}).profile.avatar"), 'custom');
+  assert.equal(run("normalizeState({profile:{name:'P',avatar:'custom',photo:'javascript:alert(1)'}}).profile.avatar"), 'frieren');
   assert.equal(run("normalizeCycle(JSON.parse(JSON.stringify(normalizeCycle({banner:'moon'})))).banner"), 'moon');
   assert.equal(run("normalizeCycle({banner:''}).banner"), '');
   assert.equal(run("safeImage('javascript:alert(1)')"), '');

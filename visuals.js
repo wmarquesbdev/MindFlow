@@ -1,5 +1,16 @@
 // Original MindFlow pixel-art collection. All assets are served locally.
 const AVATARS = [
+  { id: 'frieren', label: 'Frieren', group: 'Anime' },
+  { id: 'anya', label: 'Anya', group: 'Anime' },
+  { id: 'goku', label: 'Goku', group: 'Anime' },
+  { id: 'luffy', label: 'Luffy', group: 'Anime' },
+  { id: 'sherlock', label: 'Sherlock Holmes', group: 'Clássicos' },
+  { id: 'alice', label: 'Alice', group: 'Clássicos' },
+  { id: 'dracula', label: 'Drácula', group: 'Clássicos' },
+  { id: 'robin', label: 'Robin Hood', group: 'Clássicos' }
+];
+// Keep old selections readable when an existing user updates the app.
+const LEGACY_AVATARS = [
   { id: 'ogre', label: 'Ogro' }, { id: 'wizard', label: 'Mago' },
   { id: 'dragon', label: 'Dragão' }, { id: 'princess', label: 'Princesa' }
 ];
@@ -10,7 +21,7 @@ const BANNERS = [
   { id: 'moon', label: 'Jardim da lua' }, { id: 'desert', label: 'Oásis dourado' },
   { id: 'snow', label: 'Refúgio na neve' }, { id: 'sky', label: 'Ilha nas nuvens' }
 ];
-const avatarPath = id => `assets/pixel/avatar-${AVATARS.some(item => item.id === id) ? id : 'ogre'}.png`;
+const avatarPath = id => `assets/pixel/avatar-${[...AVATARS, ...LEGACY_AVATARS].some(item => item.id === id) ? id : 'frieren'}.png`;
 const bannerPath = id => BANNERS.some(item => item.id === id) ? `assets/pixel/banner-${id}.png` : '';
 const ICON_PATHS = {
   inicio: '<path d="m3 10 9-7 9 7v10H3Z"/><path d="M9 20v-7h6v7"/>',

@@ -30,10 +30,10 @@ function listen(server, port) {
 }
 
 async function startLocalServer() {
-  // The browser and desktop app use the same data file even when another process owns port 3000.
+  // The browser and desktop app use the same data file even when another process owns the preferred port.
   const { server } = require('./server');
   localServer = server;
-  try { return await listen(server, 3000); }
+  try { return await listen(server, 3177); }
   catch (error) {
     if (error.code !== 'EADDRINUSE') throw error;
     return listen(server, 0);

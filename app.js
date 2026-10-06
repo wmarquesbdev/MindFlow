@@ -4,6 +4,7 @@ const SYNC_MARKER_KEY = 'mindflow-sync-v1';
 const SYNC_PENDING_KEY = 'mindflow-sync-pending-v1';
 const PREVIOUS_STORAGE_KEYS = ['daydream-v1', 'norte-diario-v1'];
 const APP_NAME = 'MindFlow';
+const LOCAL_SERVER_PORT = '3177';
 let DATE_KEY = new Date().toLocaleDateString('en-CA');
 let MONTH_KEY = DATE_KEY.slice(0, 7);
 const STATUS = { backlog: 'Backlog', next: 'Próxima', doing: 'Em andamento', done: 'Concluído' };
@@ -26,7 +27,7 @@ const FINANCE_CATEGORIES = {
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const defaultState = {
-  profile: { name: '', avatar: 'ogre' },
+  profile: { name: '', avatar: 'frieren', photo: '' },
   settings: { theme: 'light', newsTopic: 'brazil', accent: 'sage', density: 'comfortable', fontScale: 'medium', showNews: true, reducedMotion: false, quoteOffset: 0, taskView: 'list' },
   habitDefinitions: DEFAULT_HABITS,
   habits: {}, journal: {}, checkin: {}, updates: [], focusMinutes: {}, rituals: {}, focusTask: '', newsCache: {},
@@ -248,7 +249,7 @@ function parseSignedMoneyToCents(value) {
 }
 
 function formatMoney(cents) { return brl.format((Number(cents) || 0) / 100); }
-function documentUrl(id) { return `${sharedEndpoint ? sharedEndpoint.replace('/api/state', '') : 'http://127.0.0.1:3000'}/api/documents/${encodeURIComponent(id)}`; }
+function documentUrl(id) { return `${sharedEndpoint ? sharedEndpoint.replace('/api/state', '') : `http://127.0.0.1:${LOCAL_SERVER_PORT}`}/api/documents/${encodeURIComponent(id)}`; }
 function documentLink(id) {
   const document = state.finance.documents.find(item => item.id === id);
   return document ? `<a class="finance-document-link" href="${escapeHTML(documentUrl(id))}" target="_blank" rel="noopener">📎 ${escapeHTML(document.name || 'Abrir arquivo')}</a>` : '';
@@ -412,7 +413,12 @@ function normalizeState(incoming = {}) {
   });
   return {
     ...base, ...incoming,
-    profile: { name: asText(incoming.profile?.name).trim().slice(0, 48), avatar: AVATARS.some(item => item.id === incoming.profile?.avatar) ? incoming.profile.avatar : 'ogre' },
+    profile: {
+      name: asText(incoming.profile?.name).trim().slice(0, 48),
+      avatar: incoming.profile?.avatar === 'custom' && safeAvatarData(incoming.profile?.photo) ? 'custom'
+        : [...AVATARS, ...LEGACY_AVATARS].some(item => item.id === incoming.profile?.avatar) ? incoming.profile.avatar : 'frieren',
+      photo: safeAvatarData(incoming.profile?.photo)
+    },
     settings: { ...base.settings, ...(incoming.settings || {}) },
     habitDefinitions: definitions,
     habits: migratedDays,
@@ -451,6 +457,7 @@ let timerPreset = 25;
 let timerRunning = false;
 let pipWindow = null;
 let newsRequest = null;
+let profilePhotoDraft = '';
 let selectedHistoryDate = DATE_KEY;
 let notesSearch = '';
 let notesCategory = 'all';
@@ -586,7 +593,7 @@ async function initializeSharedState() {
   const endpoints = [];
   if (['localhost', '127.0.0.1'].includes(location.hostname)) {
     endpoints.push(`${location.origin}/api/state`);
-    if (location.port !== '3000') endpoints.push('http://127.0.0.1:3000/api/state');
+    if (location.port !== LOCAL_SERVER_PORT) endpoints.push(`http://127.0.0.1:${LOCAL_SERVER_PORT}/api/state`);
   }
   let remote;
   for (const endpoint of endpoints) {
@@ -681,6 +688,12 @@ function safeHttp(value) {
 function safeImage(value) {
   return /^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value) ? value : safeHttp(value);
 }
+function safeAvatarData(value) {
+  return typeof value === 'string' && value.length <= 450000 && /^data:image\/(png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value) ? value : '';
+}
+function profileAvatarSrc(profile = state.profile) {
+  return profile?.avatar === 'custom' && safeAvatarData(profile.photo) ? profile.photo : avatarPath(profile?.avatar);
+}
 function cycleCover(cycle) { return cycle ? bannerPath(cycle.banner) || safeImage(cycle.image || '') : ''; }
 
 function showToast(message) {
@@ -718,8 +731,8 @@ function renderProfile() {
   const title = route === 'inicio' && name ? `${greetingForNow()}, ${name}.` : view?.dataset.title || APP_NAME;
   $('#page-title').textContent = title;
   $('#page-kicker').textContent = view?.dataset.kicker || 'SISTEMA PESSOAL';
-  $('#profile-avatar').src = avatarPath(state.profile.avatar);
-  $('#home-avatar').src = avatarPath(state.profile.avatar);
+  $('#profile-avatar').src = profileAvatarSrc();
+  $('#home-avatar').src = profileAvatarSrc();
   $('#home-profile-name').textContent = name ? `Um novo dia, ${name}.` : 'Seu espaço pessoal';
   $$('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
   $('#menu-toggle').innerHTML = icon('menu');
@@ -1198,20 +1211,44 @@ function formatNewsDate(value) {
   if (Number.isNaN(date.getTime())) return 'Data não informada';
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 }
+function updateNewsPosition(list) {
+  const count = list.querySelectorAll('.news-item').length;
+  const index = count ? Math.min(count - 1, Math.max(0, Math.round(list.scrollLeft / Math.max(1, list.clientWidth)))) : 0;
+  const page = list.id === 'news-list-page';
+  $(`#news-position${page ? '-page' : ''}`).textContent = count ? `${index + 1} / ${count}` : '—';
+  $(`#news-prev${page ? '-page' : ''}`).disabled = !count || index === 0;
+  $(`#news-next${page ? '-page' : ''}`).disabled = !count || index === count - 1;
+}
+function moveNews(list, step) {
+  const count = list.querySelectorAll('.news-item').length;
+  if (!count) return;
+  const current = Math.round(list.scrollLeft / Math.max(1, list.clientWidth));
+  const next = Math.min(count - 1, Math.max(0, current + step));
+  list.scrollTo({ left: next * list.clientWidth, behavior: state.settings.reducedMotion ? 'auto' : 'smooth' });
+  $(`#news-position${list.id === 'news-list-page' ? '-page' : ''}`).textContent = `${next + 1} / ${count}`;
+}
 function renderNews(items, { loading = false, error = false, serverMissing = false } = {}) {
   const lists = [$('#news-list'), $('#news-list-page')];
-  if (loading) { lists.forEach(list => { list.innerHTML = '<div class="news-skeleton" aria-label="Buscando destaques"><i></i><i></i><i></i></div>'; }); return; }
+  if (loading) { lists.forEach(list => { list.innerHTML = '<div class="news-skeleton" aria-label="Buscando destaques"><i></i><i></i><i></i></div>'; updateNewsPosition(list); }); return; }
   if (error) {
     lists.forEach(list => { list.innerHTML = serverMissing
       ? '<div class="news-error"><strong>Ative as notícias do seu espaço</strong><p>O Live Server abre a página, mas não fornece as notícias. Na pasta do MindFlow, abra <strong>start.bat</strong> ou execute <code>npm.cmd start</code> e mantenha o terminal aberto. Depois, tente novamente aqui.</p><p>Você pode continuar neste endereço para manter seus dados. Ao trocar de endereço ou porta, use Exportar dados e Importar backup.</p><button class="secondary-button" data-retry-news>Tentar novamente</button></div>'
-      : '<div class="news-error"><strong>Os jornais não responderam agora.</strong><p>Confira sua conexão e tente novamente em alguns instantes.</p><button class="text-button" data-retry-news>Tentar novamente</button></div>'; });
+      : '<div class="news-error"><strong>Os jornais não responderam agora.</strong><p>Confira sua conexão e tente novamente em alguns instantes.</p><button class="text-button" data-retry-news>Tentar novamente</button></div>'; updateNewsPosition(list); });
     $$('[data-retry-news]').forEach(button => button.onclick = () => loadNews({ force: true })); return;
   }
   const news = (Array.isArray(items) ? items : []).filter(item => safeHttp(item.url));
-  const topicArt = { brazil: 'village', technology: 'library', business: 'castle', world: 'coast' };
   lists.forEach(list => {
-    const limit = list.id === 'news-list' ? 3 : 10;
-    list.innerHTML = news.length ? news.slice(0, limit).map((article, index) => `<a class="news-item" href="${escapeHTML(safeHttp(article.url))}" target="_blank" rel="noopener noreferrer"><span class="news-pixel-thumb"><img src="${bannerPath(topicArt[state.settings.newsTopic] || 'village')}" alt="" loading="lazy" width="74" height="56" /><span>${String(index + 1).padStart(2, '0')}</span></span><span class="news-copy"><span class="news-title">${escapeHTML(article.title)}</span><span class="news-meta">${escapeHTML(article.domain || 'Fonte original')} · ${escapeHTML(formatNewsDate(article.date || article.seendate))}</span></span><span class="news-external" aria-hidden="true">↗</span></a>`).join('') : '<p class="news-loading">Nenhuma manchete publicada nas últimas 48 horas neste tema. Experimente outro assunto.</p>';
+    const limit = list.id === 'news-list' ? 5 : 10;
+    list.innerHTML = news.length ? news.slice(0, limit).map(article => {
+      const image = safeHttp(article.image);
+      const cover = image.startsWith('https://')
+        ? `<img data-news-cover src="${escapeHTML(image)}" alt="" loading="lazy" referrerpolicy="no-referrer" />`
+        : '<span class="news-cover-empty">Capa não disponível no feed</span>';
+      return `<a class="news-item" href="${escapeHTML(safeHttp(article.url))}" target="_blank" rel="noopener noreferrer"><span class="news-cover">${cover}</span><span class="news-copy"><span class="news-meta">${escapeHTML(article.domain || 'Fonte original')} · ${escapeHTML(formatNewsDate(article.date || article.seendate))}</span><strong class="news-title">${escapeHTML(article.title)}</strong><span class="news-summary">${escapeHTML(article.summary || 'Este veículo não forneceu um resumo no feed. Abra a matéria para ler mais.')}</span><span class="news-open">Ler no veículo original ↗</span></span></a>`;
+    }).join('') : '<p class="news-loading">Nenhuma manchete publicada nas últimas 48 horas neste tema. Experimente outro assunto.</p>';
+    list.scrollLeft = 0;
+    $$('img[data-news-cover]', list).forEach(image => { image.onerror = () => { image.closest('.news-cover').innerHTML = '<span class="news-cover-empty">Capa indisponível</span>'; }; });
+    updateNewsPosition(list);
   });
 }
 function setNewsStatus(message) {
@@ -1220,7 +1257,7 @@ function setNewsStatus(message) {
 async function fetchNewsPayload(topic, signal) {
   const path = newsEndpoint(topic);
   const endpoints = [path];
-  if (['localhost', '127.0.0.1'].includes(location.hostname) && location.port !== '3000') endpoints.push('http://127.0.0.1:3000' + path);
+  if (['localhost', '127.0.0.1'].includes(location.hostname) && location.port !== LOCAL_SERVER_PORT) endpoints.push(`http://127.0.0.1:${LOCAL_SERVER_PORT}` + path);
   let serverMissing = false;
   for (const endpoint of endpoints) {
     try {
@@ -1240,8 +1277,8 @@ async function loadNews({ force = false } = {}) {
   const topic = Object.hasOwn(NEWS_TOPICS, state.settings.newsTopic) ? state.settings.newsTopic : 'brazil';
   state.settings.newsTopic = topic;
   const cached = state.newsCache[topic];
-  const validCache = cached?.version === 2 && cached.items?.length;
-  const fresh = validCache && Date.now() - cached.savedAt < 15 * 60 * 1000;
+  const validCache = [2, 3].includes(cached?.version) && cached.items?.length;
+  const fresh = cached?.version === 3 && validCache && Date.now() - cached.savedAt < 15 * 60 * 1000;
   // Cancel before an early cache return so an older topic cannot overwrite the selected one.
   newsRequest?.abort();
   newsRequest = null;
@@ -1259,7 +1296,7 @@ async function loadNews({ force = false } = {}) {
       renderNews(items); setNewsStatus(`Sem atualização · conteúdo de ${formatNewsDate(payload.updatedAt)}`); return;
     }
     if (!items.length && validCache) { renderNews(cached.items); setNewsStatus('Sem novas manchetes · última consulta salva'); return; }
-    state.newsCache[topic] = { version: 2, savedAt: Date.now(), updatedAt: payload.updatedAt, items };
+    state.newsCache[topic] = { version: 3, savedAt: Date.now(), updatedAt: payload.updatedAt, items };
     save({ localOnly: true }); renderNews(items); setNewsStatus(`Consultado em ${formatNewsDate(payload.updatedAt)}`);
   } catch (error) {
     if (newsRequest !== controller) return;
@@ -1502,8 +1539,31 @@ function setRoute(route) {
 
 function renderAvatarPicker() {
   const selected = $('#profile-avatar-input').value;
-  $('#avatar-picker').innerHTML = AVATARS.map(avatar => `<button type="button" class="avatar-choice" data-avatar="${avatar.id}" aria-pressed="${avatar.id === selected}"><img src="${avatarPath(avatar.id)}" alt="" width="88" height="88" /><span>${avatar.label}</span></button>`).join('');
+  const legacy = LEGACY_AVATARS.find(item => item.id === selected);
+  const choices = legacy ? [...AVATARS, legacy] : AVATARS;
+  $('#avatar-picker').innerHTML = choices.map(avatar => `<button type="button" class="avatar-choice" data-avatar="${avatar.id}" aria-pressed="${avatar.id === selected}" aria-label="Escolher ${escapeHTML(avatar.label)}"><img src="${avatarPath(avatar.id)}" alt="" width="88" height="88" /><span>${escapeHTML(avatar.label)}</span></button>`).join('');
   $$('[data-avatar]').forEach(button => button.onclick = () => { $('#profile-avatar-input').value = button.dataset.avatar; renderAvatarPicker(); $$('#avatar-picker button').find(item => item.dataset.avatar === button.dataset.avatar)?.focus(); });
+  const upload = $('#choose-profile-photo');
+  upload.setAttribute('aria-pressed', String(selected === 'custom'));
+  const preview = $('#profile-photo-preview');
+  preview.hidden = !profilePhotoDraft;
+  if (profilePhotoDraft) preview.src = profilePhotoDraft;
+  $('#profile-photo-label').textContent = profilePhotoDraft ? 'Minha foto' : 'Enviar foto';
+}
+async function readProfilePhoto(file) {
+  if (!file || !['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024) throw new Error('Escolha uma imagem PNG, JPG ou WebP de até 8 MB.');
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Não foi possível preparar esta imagem.');
+    const side = Math.min(bitmap.width, bitmap.height);
+    context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 256, 256);
+    const data = canvas.toDataURL('image/webp', .78);
+    if (!safeAvatarData(data)) throw new Error('Esta imagem ficou grande demais. Escolha outra foto.');
+    return data;
+  } finally { bitmap.close(); }
 }
 function renderBannerPicker() {
   const selected = $('#cycle-banner-input').value;
@@ -2142,9 +2202,11 @@ function bindDialogs() {
     const configured = Boolean(profileName());
     $('#profile-dialog-kicker').textContent = configured ? 'SEU PERFIL LOCAL' : 'BEM-VINDO';
     $('#profile-dialog-title').textContent = configured ? 'Como quer ser chamado?' : `Bem-vindo ao ${APP_NAME}`;
-    $('#profile-dialog-copy').textContent = configured ? 'Escolha seu apelido e um personagem para acompanhar seu dia.' : 'Informe seu nome para personalizar as saudações. Ele fica salvo neste PC.';
+    $('#profile-dialog-copy').textContent = configured ? 'Escolha um personagem ou sua própria foto. Tudo fica neste PC.' : 'Escolha um apelido e um avatar. Sem conta, sem senha.';
     $('#profile-name-input').value = profileName();
-    $('#profile-avatar-input').value = state.profile.avatar || 'ogre';
+    $('#profile-avatar-input').value = state.profile.avatar || 'frieren';
+    profilePhotoDraft = safeAvatarData(state.profile.photo);
+    $('#profile-photo-input').value = '';
     renderAvatarPicker();
     $('#profile-cancel').hidden = !configured;
     $('#profile-submit').textContent = configured ? 'Salvar perfil' : 'Entrar no meu espaço';
@@ -2153,6 +2215,15 @@ function bindDialogs() {
   };
   $('#profile-button').onclick = openProfile;
   $('#edit-profile-home').onclick = openProfile;
+  $('#choose-profile-photo').onclick = () => $('#profile-photo-input').click();
+  $('#profile-photo-input').onchange = async event => {
+    try {
+      profilePhotoDraft = await readProfilePhoto(event.target.files?.[0]);
+      $('#profile-avatar-input').value = 'custom';
+      renderAvatarPicker();
+      $('#choose-profile-photo').focus();
+    } catch (error) { showToast(error.message || 'Não foi possível abrir esta foto.'); }
+  };
   $('#profile-cancel').onclick = () => profileDialog.close();
   profileDialog.addEventListener('cancel', event => { if (!profileName()) event.preventDefault(); });
   $('#profile-form').onsubmit = event => {
@@ -2161,6 +2232,7 @@ function bindDialogs() {
     if (!name) { $('#profile-name-input').focus(); return; }
     state.profile.name = name.slice(0, 48);
     state.profile.avatar = $('#profile-avatar-input').value;
+    state.profile.photo = profilePhotoDraft;
     if (!save()) return;
     profileDialog.close(); renderAll(); showToast(`Tudo certo, ${state.profile.name}.`);
   };
@@ -2235,6 +2307,17 @@ function bindApp() {
   };
   [$('#news-topic'), $('#news-topic-page')].filter(Boolean).forEach(select => { select.value = state.settings.newsTopic || 'brazil'; select.onchange = event => setTopic(event.target.value); });
   [$('#refresh-news'), $('#refresh-news-page')].filter(Boolean).forEach(button => { button.onclick = () => loadNews({ force: true }); });
+  for (const [suffix, id] of [['', 'news-list'], ['-page', 'news-list-page']]) {
+    const list = $(`#${id}`);
+    $(`#news-prev${suffix}`).onclick = () => moveNews(list, -1);
+    $(`#news-next${suffix}`).onclick = () => moveNews(list, 1);
+    list.onscroll = () => updateNewsPosition(list);
+    list.onkeydown = event => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault(); moveNews(list, event.key === 'ArrowLeft' ? -1 : 1);
+      }
+    };
+  }
   $('#notes-search').oninput = event => { notesSearch = event.target.value; renderNotes(); };
   $('#notes-category-filter').onchange = event => { notesCategory = event.target.value; renderNotes(); };
   const updatePreference = (key, value) => { state.settings[key] = value; save(); applyTheme(); renderPreferences(); };

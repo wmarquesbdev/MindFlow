@@ -54,13 +54,13 @@
           <div class="topbar-actions">
             <button class="capture-button" id="open-capture" aria-label="Capturar tarefa rapidamente">+ <span>Capturar</span></button>
             <button class="theme-toggle" id="theme-toggle" aria-label="Ativar modo escuro" title="Alternar tema"><span id="theme-icon">☾</span></button>
-            <button class="profile-button" id="profile-button" aria-label="Definir seu nome" title="Definir seu nome"><img id="profile-avatar" src="assets/pixel/avatar-ogre.png" alt="" width="40" height="40" /></button>
+            <button class="profile-button" id="profile-button" aria-label="Definir seu nome" title="Definir seu nome"><img id="profile-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="40" height="40" /></button>
             <div class="date-display" id="date-display"></div>
           </div>
         </header>
 
         <section class="view active" id="inicio" data-title="Seu espaço está pronto." data-kicker="SISTEMA PESSOAL">
-          <div class="home-profile"><img id="home-avatar" src="assets/pixel/avatar-ogre.png" alt="" width="64" height="64" /><div><span class="section-label">Seu lugar, seu ritmo</span><p id="home-profile-name">Seu espaço pessoal</p></div><button class="text-button" id="edit-profile-home">Editar perfil</button></div>
+          <div class="home-profile"><img id="home-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="64" height="64" /><div><span class="section-label">Seu lugar, seu ritmo</span><p id="home-profile-name">Seu espaço pessoal</p></div><button class="text-button" id="edit-profile-home">Editar perfil</button></div>
           <div class="hero-grid">
             <article class="hero-copy card">
               <p class="section-label">DIREÇÃO DO DIA</p>
@@ -91,10 +91,10 @@
               <div id="priority-list" class="priority-list"></div>
             </article>
             <article class="card news-card">
-              <div class="section-heading"><div><p class="section-label">ATUALIZAÇÕES DO DIA</p><h2>Notícias relevantes</h2></div><button class="icon-button" id="refresh-news" aria-label="Atualizar notícias" title="Atualizar notícias">↻</button></div>
+              <div class="section-heading"><div><p class="section-label">ATUALIZAÇÕES DO DIA</p><h2>Notícias relevantes</h2></div><div class="news-header-actions"><button class="icon-button" id="refresh-news" aria-label="Atualizar notícias" title="Atualizar notícias">↻</button><button class="icon-button" id="news-prev" aria-label="Notícia anterior">‹</button><span id="news-position" class="news-position" aria-live="polite">—</span><button class="icon-button" id="news-next" aria-label="Próxima notícia">›</button></div></div>
               <div class="news-controls"><label for="news-topic">Tema</label><select id="news-topic"><option value="brazil">Brasil</option><option value="technology">Tecnologia</option><option value="business">Economia</option><option value="world">Mundo</option></select><span id="news-status" aria-live="polite"></span></div>
-              <div id="news-list" class="news-list" aria-live="polite"></div>
-              <p class="news-source">Destaques dos feeds por atualidade · até 48 horas · leia no veículo original.</p><button class="text-button" data-route="noticias">Ver todas as notícias →</button>
+              <div id="news-list" class="news-list" role="region" aria-label="Notícias relevantes" tabindex="0"></div>
+              <div class="news-footer"><p class="news-source">Capas e resumos dos veículos quando disponíveis · até 48 horas.</p><button class="text-button" data-route="noticias">Ver mais notícias →</button></div>
             </article>
           </div>
 
@@ -257,11 +257,11 @@
         </section>
 
         <section class="view" id="noticias" data-title="Últimas notícias" data-kicker="INFORMAÇÃO SEM PRESSA">
-          <div class="section-heading page-intro"><div><span class="section-label">Leitura do dia</span><h2>Veja o essencial, sem transformar tudo em urgência.</h2><p>O último conteúdo salvo aparece na hora; a atualização acontece em segundo plano.</p></div><button class="secondary-button" id="refresh-news-page">↻ Atualizar</button></div>
+          <div class="section-heading page-intro"><div><span class="section-label">Leitura do dia</span><h2>Veja o essencial, sem transformar tudo em urgência.</h2><p>Deslize entre as manchetes, leia o resumo e abra a notícia no veículo original.</p></div><button class="secondary-button" id="refresh-news-page">↻ Atualizar</button></div>
           <article class="card news-page-card">
-            <div class="news-controls page-news-controls"><label for="news-topic-page">Assunto</label><select id="news-topic-page"><option value="brazil">Brasil</option><option value="technology">Tecnologia</option><option value="business">Economia</option><option value="world">Mundo</option></select><span id="news-status-page" aria-live="polite"></span></div>
-            <div id="news-list-page" class="news-list news-grid" aria-live="polite"></div>
-            <p class="news-source">Destaques dos feeds por atualidade · até 48 horas · leia no veículo original.</p>
+            <div class="news-page-toolbar"><div class="news-controls page-news-controls"><label for="news-topic-page">Assunto</label><select id="news-topic-page"><option value="brazil">Brasil</option><option value="technology">Tecnologia</option><option value="business">Economia</option><option value="world">Mundo</option></select><span id="news-status-page" aria-live="polite"></span></div><div class="news-header-actions"><button class="icon-button" id="news-prev-page" aria-label="Notícia anterior">‹</button><span id="news-position-page" class="news-position" aria-live="polite">—</span><button class="icon-button" id="news-next-page" aria-label="Próxima notícia">›</button></div></div>
+            <div id="news-list-page" class="news-list" role="region" aria-label="Todas as notícias" tabindex="0"></div>
+            <p class="news-source">Capas e resumos publicados pelos veículos quando disponíveis · até 48 horas.</p>
           </article>
         </section>
 
@@ -288,8 +288,9 @@
 
     <dialog id="profile-dialog" class="modal profile-modal" aria-labelledby="profile-dialog-title">
       <form id="profile-form">
-        <div class="modal-header"><div><p class="section-label" id="profile-dialog-kicker">BEM-VINDO</p><h2 id="profile-dialog-title">Bem-vindo ao MindFlow</h2><p id="profile-dialog-copy">Informe seu nome para personalizar as saudações. Ele fica salvo somente neste navegador.</p></div></div>
-        <fieldset class="avatar-fieldset"><legend>Escolha seu personagem</legend><div class="avatar-picker" id="avatar-picker"></div></fieldset><input type="hidden" id="profile-avatar-input" value="ogre" /><label for="profile-name-input">Seu apelido<input id="profile-name-input" name="name" autocomplete="nickname" maxlength="48" required placeholder="Como quer ser chamado?" /></label>
+        <div class="modal-header"><div><p class="section-label" id="profile-dialog-kicker">BEM-VINDO</p><h2 id="profile-dialog-title">Bem-vindo ao MindFlow</h2><p id="profile-dialog-copy">Escolha um apelido e um avatar. Sem conta, sem senha.</p></div></div>
+        <label for="profile-name-input">Seu apelido<input id="profile-name-input" name="name" autocomplete="nickname" maxlength="48" required placeholder="Como quer ser chamado?" /></label>
+        <fieldset class="avatar-fieldset"><legend>Escolha um personagem</legend><p class="avatar-hint">Oito retratos em pixel art, de anime e histórias clássicas. Ou use sua foto.</p><div class="avatar-picker" id="avatar-picker"></div></fieldset><input type="hidden" id="profile-avatar-input" value="frieren" /><input id="profile-photo-input" type="file" accept="image/png,image/jpeg,image/webp" hidden /><button type="button" class="avatar-upload-choice" id="choose-profile-photo" aria-pressed="false"><img id="profile-photo-preview" alt="" width="44" height="44" hidden /><span class="avatar-upload-icon" aria-hidden="true">+</span><span><strong id="profile-photo-label">Enviar foto</strong><small>PNG, JPG ou WebP · fica só neste PC</small></span></button>
         <p class="modal-hint">Sem senha ou cadastro. Seu perfil fica neste PC.</p>
         <div class="modal-actions"><button type="button" id="profile-cancel" class="secondary-button" hidden>Cancelar</button><button id="profile-submit" class="primary-button">Entrar no meu espaço</button></div>
       </form>

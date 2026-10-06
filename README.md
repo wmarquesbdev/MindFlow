@@ -18,11 +18,11 @@ npm.cmd install
 npm.cmd start
 ```
 
-Abra `http://127.0.0.1:3000`. No PowerShell, use `npm.cmd` se a execução de scripts estiver bloqueada.
+Abra `http://127.0.0.1:3177`. No PowerShell, use `npm.cmd` se a execução de scripts estiver bloqueada.
 
 ## O que tem
 
-Hábitos por mês, tarefas em lista ou Kanban, notas, estudos, Pomodoro, notícias, autocuidado e controle simples de conta, Pix, boletos e cartão. Comprovantes podem ser anexados; a leitura local de documentos apenas sugere valores e vencimentos — confirme sempre com o original.
+Hábitos por mês, tarefas em lista ou Kanban, notas, estudos, Pomodoro, notícias com capas e resumos dos feeds, autocuidado e controle simples de conta, Pix, boletos e cartão. O perfil aceita oito retratos de personagens ou sua foto. Comprovantes podem ser anexados; a leitura local de documentos apenas sugere valores e vencimentos — confirme sempre com o original.
 
 ## Seus dados
 
@@ -38,3 +38,5 @@ npm.cmd run make
 ```
 
 O instalador gerado fica em `out/make/squirrel.windows/x64/`. Artes: [pixel art](assets/pixel/ART.md). Licença [MIT](LICENSE).
+
+Os retratos de personagens são fan art gerada para o projeto, não imagens oficiais. Personagens e marcas pertencem a seus respectivos titulares; o MindFlow não é afiliado a eles.

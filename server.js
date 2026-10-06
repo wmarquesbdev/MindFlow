@@ -7,7 +7,7 @@ const { MAX_DOCUMENT_BYTES, saveDocument, readDocument } = require('./documents'
 const JSZip = require('jszip');
 
 const HOST = '127.0.0.1';
-const PORT = Number(process.env.MINDFLOW_PORT) || 3000;
+const PORT = Number(process.env.MINDFLOW_PORT) || 3177;
 const ROOT = __dirname;
 const store = createStateStore();
 const TYPES = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
@@ -145,7 +145,7 @@ const server = http.createServer(async (request, response) => {
   if (!file) { response.writeHead(404); response.end('Arquivo não encontrado.'); return; }
   fs.readFile(file, (error, content) => {
     if (error) { response.writeHead(error.code === 'ENOENT' ? 404 : 500); response.end('Arquivo indisponível.'); return; }
-    response.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' http://127.0.0.1:3000; object-src 'none'; base-uri 'self'; frame-ancestors 'none'", 'Cache-Control': file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=86400' : 'no-cache' });
+    response.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' http://127.0.0.1:3177; object-src 'none'; base-uri 'self'; frame-ancestors 'none'", 'Cache-Control': file.includes(`${path.sep}assets${path.sep}`) ? 'public, max-age=86400' : 'no-cache' });
     response.end(request.method === 'HEAD' ? undefined : content);
   });
 });
