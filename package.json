@@ -1,13 +1,31 @@
 {
   "name": "mindflow",
-  "version": "1.0.0",
+  "version": "2.6.0",
   "private": true,
-  "description": "Um sistema pessoal local para hábitos, planejamento e foco.",
+  "productName": "MindFlow",
+  "author": "MindFlow contributors",
+  "main": "desktop.js",
+  "description": "Um sistema pessoal local para hábitos, tarefas, finanças, foco e autocuidado.",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check app.js && node --check server.js"
+    "desktop": "electron .",
+    "make": "electron-forge make",
+    "check": "node --check app.js && node --check visuals.js && node --check news.js && node --check storage.js && node --check documents.js && node --check server.js && node --check desktop.js && node --check forge.config.js",
+    "test": "node --test tests/*.test.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.13.0"
+  },
+  "dependencies": {
+    "@tesseract.js-data/por": "^1.0.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "jszip": "^3.10.1",
+    "pdfjs-dist": "^6.4.299",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^8.0.1",
+    "@electron-forge/maker-squirrel": "^8.0.1",
+    "electron": "^44.5.1"
   }
 }

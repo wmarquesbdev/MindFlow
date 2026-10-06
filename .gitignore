@@ -8,5 +8,16 @@ Thumbs.db
 
 # Dados e backups pessoais
 mindflow-backup-*.json
+mindflow-completo-*.zip
 *.local.json
 .env
+
+# Dependências e instaladores gerados localmente
+node_modules/
+out/
+dist/
+.npm-cache/
+.electron-cache/
+.test-data/
+.test-desktop-data/
+.test-desktop-appdata/

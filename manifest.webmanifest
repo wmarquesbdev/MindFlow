@@ -1,7 +1,7 @@
 {
   "name": "MindFlow",
   "short_name": "MindFlow",
-  "description": "Um espaço pessoal para hábitos, planejamento e foco.",
+  "description": "Um espaço pessoal para hábitos, tarefas, finanças, foco e autocuidado.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f7faf8",
