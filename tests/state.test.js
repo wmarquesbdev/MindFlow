@@ -48,6 +48,19 @@ test('all static HTML IDs are unique', () => {
   const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]);
   assert.equal(new Set(ids).size, ids.length);
 });
+test('new task default is the board and explicit versioned list preference is preserved', () => {
+  const run = model();
+  assert.equal(run("normalizeState({settings:{taskView:'list'}}).settings.taskView"), 'board');
+  assert.equal(run("normalizeState({settings:{taskView:'list',taskViewVersion:2}}).settings.taskView"), 'list');
+  assert.equal(run('normalizeState({}).settings.showHomeStudies'), true);
+});
+test('study customization and progress round-trip without losing old records', () => {
+  const run = model();
+  const item = run("normalizeLearningItem({id:'x',title:'Livro',type:'reading',total:200,current:90,description:'Minha meta',unit:'pages',color:'rose',url:'https://example.com'})");
+  assert.equal(item.current, 90); assert.equal(item.description, 'Minha meta'); assert.equal(item.color, 'rose');
+  const course = run("normalizeLearningItem({type:'course',total:10,current:25,url:'javascript:alert(1)'})");
+  assert.equal(course.current, 10); assert.equal(course.unit, 'hours'); assert.equal(course.url, '');
+});
 test('all declared navigation destinations have a view', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   const routes = [...html.matchAll(/data-route="([a-z]+)"/g)].map(match => match[1]);

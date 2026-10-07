@@ -28,11 +28,11 @@ const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 
 const defaultState = {
   profile: { name: '', avatar: 'frieren', photo: '' },
-  settings: { theme: 'light', newsTopic: 'brazil', accent: 'sage', density: 'comfortable', fontScale: 'medium', showNews: true, reducedMotion: false, quoteOffset: 0, taskView: 'list' },
+  settings: { theme: 'light', newsTopic: 'brazil', accent: 'sage', density: 'comfortable', fontScale: 'medium', showNews: true, showHomeStudies: true, reducedMotion: false, quoteOffset: 0, taskView: 'board', taskViewVersion: 2, surface: 'soft', fontFamily: 'sans', contentWidth: 'balanced', startPage: 'inicio', focusDuration: 25, historyView: 'list' },
   habitDefinitions: DEFAULT_HABITS,
   habits: {}, journal: {}, checkin: {}, updates: [], focusMinutes: {}, rituals: {}, focusTask: '', newsCache: {},
   tasks: [],
-  learning: [],
+  learning: [], focusSessions: {},
   ikigai: {},
   dreams: [],
   cycles: [],
@@ -172,13 +172,18 @@ function normalizeTask(task = {}) {
 
 function normalizeLearningItem(item = {}) {
   const source = item && typeof item === 'object' ? item : {};
-  const total = Math.max(0, Number(source.total) || 0);
+  const total = Math.max(0, Math.min(1000000, Number(source.total) || 0));
   return {
     id: asText(source.id) || makeId(),
     title: asText(source.title, 'Novo item').trim() || 'Novo item',
     type: source.type === 'course' ? 'course' : 'reading',
     author: asText(source.author),
     category: asText(source.category, 'Geral').trim().slice(0, 40) || 'Geral',
+    description: asText(source.description).trim().slice(0, 600),
+    color: ['sage', 'ocean', 'lavender', 'sand', 'rose', 'slate'].includes(source.color) ? source.color : 'sage',
+    unit: ['pages', 'lessons', 'hours'].includes(source.unit) ? source.unit : source.type === 'course' ? 'hours' : 'pages',
+    url: safeHttp(asText(source.url)),
+    updatedAt: asText(source.updatedAt),
     total,
     current: Math.max(0, Math.min(Number(source.current) || 0, total || Number.MAX_SAFE_INTEGER))
   };
@@ -419,7 +424,8 @@ function normalizeState(incoming = {}) {
         : [...AVATARS, ...LEGACY_AVATARS].some(item => item.id === incoming.profile?.avatar) ? incoming.profile.avatar : 'frieren',
       photo: safeAvatarData(incoming.profile?.photo)
     },
-    settings: { ...base.settings, ...(incoming.settings || {}) },
+    settings: { ...base.settings, ...(incoming.settings || {}), taskView: incoming.settings?.taskViewVersion === 2 && incoming.settings.taskView === 'list' ? 'list' : 'board', taskViewVersion: 2 },
+    focusSessions: incoming.focusSessions && typeof incoming.focusSessions === 'object' && !Array.isArray(incoming.focusSessions) ? incoming.focusSessions : {},
     habitDefinitions: definitions,
     habits: migratedDays,
     cycles,
@@ -449,12 +455,17 @@ let sharedPending = false;
 let sharedSaving = false;
 let sharedConflict = false;
 let sharedConnecting = false;
-let activeLibrary = 'reading';
+let activeLibrary = 'all';
 let activeLearningCategory = 'all';
+let learningSearch = '';
+let learningStatus = 'all';
 let timerInterval = null;
 let timerSeconds = 25 * 60;
 let timerPreset = 25;
 let timerRunning = false;
+let timerMode = 'focus';
+let browserClock;
+let focusBound = false;
 let pipWindow = null;
 let newsRequest = null;
 let profilePhotoDraft = '';
@@ -736,7 +747,8 @@ function renderProfile() {
   $('#home-profile-name').textContent = name ? `Um novo dia, ${name}.` : 'Seu espaço pessoal';
   $$('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
   $('#menu-toggle').innerHTML = icon('menu');
-  $('#refresh-news').innerHTML = icon('refresh');
+  $('#refresh-news').innerHTML = `${icon('refresh')} Atualizar`;
+  $('#refresh-news').setAttribute('aria-label', 'Atualizar notícias');
   $('#profile-button').setAttribute('aria-label', name ? `Editar perfil de ${name}` : 'Definir seu nome');
   $('#profile-button').setAttribute('title', name ? `Editar perfil de ${name}` : 'Definir seu nome');
 }
@@ -745,7 +757,10 @@ function applyTheme() {
   const theme = state.settings.theme === 'dark' ? 'dark' : 'light';
   const root = document.documentElement;
   root.dataset.theme = theme;
-  root.dataset.accent = ['sage', 'ocean', 'lavender', 'sand'].includes(state.settings.accent) ? state.settings.accent : 'sage';
+  root.dataset.accent = ['sage', 'ocean', 'lavender', 'sand', 'rose', 'slate'].includes(state.settings.accent) ? state.settings.accent : 'sage';
+  root.dataset.surface = state.settings.surface === 'flat' ? 'flat' : 'soft';
+  root.dataset.fontFamily = state.settings.fontFamily === 'serif' ? 'serif' : 'sans';
+  root.dataset.contentWidth = state.settings.contentWidth === 'wide' ? 'wide' : 'balanced';
   root.dataset.density = state.settings.density === 'compact' ? 'compact' : 'comfortable';
   root.dataset.fontScale = ['small', 'large'].includes(state.settings.fontScale) ? state.settings.fontScale : 'medium';
   root.dataset.reducedMotion = state.settings.reducedMotion ? 'true' : 'false';
@@ -755,6 +770,7 @@ function applyTheme() {
   $('#theme-toggle').setAttribute('title', theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro');
   const newsCard = $('#home-news-card') || $('#inicio .news-card');
   if (newsCard) newsCard.hidden = state.settings.showNews === false;
+  if ($('#home-studies')) $('#home-studies').hidden = state.settings.showHomeStudies === false;
 }
 
 function completedHabitCount() { return activeHabits().filter(habit => todayHabits()[habit.id]).length; }
@@ -829,6 +845,9 @@ function renderPriorities() {
       <span class="badge ${task.priority}">${priorityLabel(task.priority)}</span></div>`).join('') : '<p class="updates-empty">Nada definido ainda. Capture uma tarefa e escolha a próxima ação.</p>';
   $$('[data-priority-task]').forEach(input => input.onchange = () => updateTask(input.dataset.priorityTask, { status: input.checked ? 'done' : 'next' }));
   const nextTask = getNextTask();
+  $('#home-direction-title').textContent = nextTask ? nextTask.title : 'Um dia com espaço para o que importa.';
+  $('#home-direction-copy').textContent = nextTask ? 'Sua próxima ação está aqui. Abra o dia e avance no seu ritmo.' : 'Escolha uma tarefa, cuide dos hábitos e reserve um momento para aprender.';
+  $('#home-focus-summary').textContent = `${state.focusMinutes[DATE_KEY] || 0} min de foco hoje`;
   $('#today-next-title').textContent = nextTask ? nextTask.title : 'Escolha a próxima ação.';
   $('#today-next-note').textContent = nextTask ? (nextTask.note || 'Defina um começo simples e inicie um bloco de foco.') : 'Capture uma tarefa, mova para “Próxima” e dê atenção a uma coisa por vez.';
 }
@@ -913,6 +932,7 @@ function renderKanban() {
     $(`#count-${status}`).textContent = tasks.length;
     zone.innerHTML = tasks.length ? tasks.map(task => {
       const index = flow.indexOf(status); const left = index > 0 ? flow[index - 1] : null; const right = index < flow.length - 1 ? flow[index + 1] : null;
+      if (status === 'done') return `<article class="kanban-card completed-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="completed-mark">✓ Concluída</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4><button class="text-button" data-move="${escapeHTML(task.id)}" data-to="next">Reabrir</button></article>`;
       return `<article class="kanban-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="badge ${task.area}">${task.area === 'work' ? 'Trabalho' : 'Pessoal'}</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4>${task.note ? `<p>${escapeHTML(task.note)}</p>` : ''}<div class="kanban-meta"><span class="badge ${task.priority}">${priorityLabel(task.priority)}</span><span class="task-date">${formatTaskDate(task.date)}</span></div><div class="kanban-actions">${left ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${left}">← ${STATUS[left]}</button>` : ''}${right ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${right}">${STATUS[right]} →</button>` : ''}</div></article>`;
     }).join('') : '<p class="empty-column">Solte um cartão aqui</p>';
   });
@@ -927,25 +947,47 @@ function renderKanban() {
 }
 
 function renderLearning() {
-  $$('.library-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.library === activeLibrary));
-  const categories = [...new Set(state.learning.filter(item => item.type === activeLibrary).map(item => item.category || 'Geral'))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  $$('.library-tab').forEach(tab => { tab.classList.toggle('active', tab.dataset.library === activeLibrary); tab.setAttribute('aria-pressed', String(tab.dataset.library === activeLibrary)); });
+  const categories = [...new Set(state.learning.filter(item => activeLibrary === 'all' || item.type === activeLibrary).map(item => item.category || 'Geral'))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   const categoryFilter = $('#learning-category-filter');
   categoryFilter.innerHTML = '<option value="all">Todas as categorias</option>' + categories.map(category => `<option value="${escapeHTML(category)}">${escapeHTML(category)}</option>`).join('');
   if (!categories.includes(activeLearningCategory)) activeLearningCategory = 'all';
   categoryFilter.value = activeLearningCategory;
-  const items = state.learning.filter(item => item.type === activeLibrary && (activeLearningCategory === 'all' || (item.category || 'Geral') === activeLearningCategory));
-  const unit = activeLibrary === 'reading' ? 'páginas' : 'horas';
+  const items = state.learning.filter(item => (activeLibrary === 'all' || item.type === activeLibrary) && (activeLearningCategory === 'all' || (item.category || 'Geral') === activeLearningCategory) && (!learningSearch || `${item.title} ${item.author} ${item.description}`.toLocaleLowerCase('pt-BR').includes(learningSearch)) && (learningStatus === 'all' || (learningStatus === 'done' ? item.total > 0 && item.current >= item.total : item.total === 0 || item.current < item.total)));
+  $('#learning-summary').textContent = `${state.learning.length} ${state.learning.length === 1 ? 'item' : 'itens'} · ${state.learning.filter(item => item.total > 0 && item.current >= item.total).length} concluídos`;
   $('#library-list').innerHTML = items.length ? items.map(item => {
     const percentage = progress(item.current, item.total);
-    return `<article class="learning-card card"><div class="learning-card-top"><span class="learning-type">${escapeHTML(item.category || (item.type === 'reading' ? 'Leitura' : 'Curso'))}</span><button class="text-button" data-learning-progress="${escapeHTML(item.id)}">+ progresso</button></div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.author || 'Sem autor/plataforma')}</p><footer><div class="progress-track"><span style="width:${percentage}%"></span></div><span>${item.current || 0}/${item.total || '?'} ${unit}</span></footer></article>`;
-  }).join('') : `<p class="updates-empty">Nenhum item ainda. Adicione seu próximo ${activeLibrary === 'reading' ? 'livro' : 'curso'}.</p>`;
+    return `<article class="learning-card card ${percentage === 100 ? 'is-complete' : ''}" data-study-color="${item.color}"><div class="learning-card-top"><span class="learning-type">${item.type === 'reading' ? 'Leitura' : 'Curso'} · ${escapeHTML(item.category)}</span><button class="text-button" data-edit-learning="${escapeHTML(item.id)}">Editar</button></div><h3>${escapeHTML(item.title)}</h3><p class="learning-author">${escapeHTML(item.author || 'Seu próximo aprendizado')}</p>${item.description ? `<p class="learning-description">${escapeHTML(item.description)}</p>` : ''}<footer><div class="progress-track"><span style="width:${percentage}%"></span></div><span>${percentage}%</span></footer><div class="learning-card-bottom"><span>${item.current}/${item.total || '?'} ${learningUnit(item)}</span><button class="secondary-button" data-learning-progress="${escapeHTML(item.id)}">${percentage === 100 ? '✓ Concluído' : 'Registrar progresso'}</button></div>${item.url ? `<a class="text-button learning-link" href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer">Abrir material ↗</a>` : ''}</article>`;
+  }).join('') : '<p class="updates-empty">Nenhum estudo neste filtro. Adicione um livro ou curso, ou limpe os filtros.</p>';
   $$('[data-learning-progress]').forEach(button => button.onclick = () => {
     const item = state.learning.find(entry => entry.id === button.dataset.learningProgress);
-    const current = prompt(`Qual é o progresso atual em ${item.type === 'reading' ? 'páginas' : 'horas'}?`, item.current);
-    if (current === null) return;
-    item.current = Math.max(0, Math.min(Number(current) || 0, Number(item.total) || Infinity));
-    save(); renderLearning(); updateSummary();
+    $('#progress-item-id').value = item.id;
+    $('#progress-title').textContent = item.title;
+    $('#progress-copy').textContent = `Até onde você chegou? Informe o total acumulado em ${learningUnit(item)}.`;
+    $('#progress-current').value = item.current; $('#progress-total').value = item.total || '';
+    openDialog('learning-progress-dialog'); $('#progress-current').focus();
   });
+  $$('[data-edit-learning]').forEach(button => button.onclick = () => openLearningEditor(state.learning.find(item => item.id === button.dataset.editLearning)));
+  renderHomeStudies();
+}
+function learningUnit(item) { return ({ pages: 'páginas', lessons: 'aulas', hours: 'horas' })[item.unit] || (item.type === 'course' ? 'horas' : 'páginas'); }
+function openLearningEditor(item) {
+  $('#learning-form').reset();
+  $('#learning-id-input').value = item?.id || '';
+  $('#learning-dialog-title').textContent = item ? 'Editar estudo' : 'Adicionar estudo';
+  for (const key of ['title', 'author', 'category', 'description', 'url']) $(`#learning-${key}-input`).value = item?.[key] || '';
+  $('#learning-type-input').value = item?.type || (activeLibrary === 'course' ? 'course' : 'reading');
+  $('#learning-unit-input').value = item?.unit || (activeLibrary === 'course' ? 'lessons' : 'pages');
+  $('#learning-color-input').value = item?.color || 'sage';
+  $('#learning-total-input').value = item?.total || '';
+  $('#learning-current-input').value = item?.current || 0;
+  $('#learning-delete').hidden = !item;
+  openDialog('learning-dialog'); $('#learning-title-input').focus();
+}
+function renderHomeStudies() {
+  const items = state.learning.filter(item => !item.total || item.current < item.total).slice(0, 2);
+  $('#home-study-list').innerHTML = items.length ? items.map(item => `<button class="home-study-item" data-open-study="${escapeHTML(item.id)}"><span>${item.type === 'course' ? 'Curso' : 'Leitura'}</span><strong>${escapeHTML(item.title)}</strong><small>${progress(item.current, item.total)}% · continuar →</small></button>`).join('') : '<p class="updates-empty">Separe um livro ou curso para continuar no seu ritmo.</p>';
+  $$('[data-open-study]').forEach(button => button.onclick = () => { setRoute('biblioteca'); openLearningEditor(state.learning.find(item => item.id === button.dataset.openStudy)); });
 }
 
 function renderVision() {
@@ -980,6 +1022,11 @@ function renderCycles() {
   if (homeCycle) homeCycle.textContent = selected.name;
   const stats = cycleStats(selected);
   $('#active-cycle-overview').innerHTML = `${cycleCover(selected) ? `<img class="cycle-overview-banner" src="${escapeHTML(cycleCover(selected))}" alt="" />` : ''}<div class="cycle-overview-copy"><span class="soft-pill">Mês aberto · ${escapeHTML(monthName)}</span><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(selected.description || 'Defina uma intenção para este ciclo.')}</p><div class="cycle-goals">${selected.goals.length ? selected.goals.map(goal => `<span>○ ${escapeHTML(goal)}</span>`).join('') : '<span>Adicione metas ao editar este mês.</span>'}</div></div><div class="cycle-overview-stats"><strong>${stats.percentage}%</strong><span>consistência em ${stats.days} ${stats.days === 1 ? 'dia' : 'dias'}</span><small>${stats.habits} hábitos ativos</small><button class="secondary-button" data-manage-cycle-habits="${escapeHTML(selected.id)}">Configurar hábitos</button></div>`;
+  const overview = $('#active-cycle-overview');
+  const hero = document.createElement('div');
+  hero.className = `cycle-hero ${cycleCover(selected) ? 'has-cover' : ''}`;
+  while (overview.firstChild) hero.append(overview.firstChild);
+  overview.append(hero);
   const calendar = document.createElement('details');
   calendar.className = 'cycle-days';
   const numberOfDays = new Date(Number(selected.month.slice(0, 4)), Number(selected.month.slice(5)), 0).getDate();
@@ -1090,6 +1137,8 @@ function renderPreferences() {
   $$('[data-font-scale]').forEach(button => button.classList.toggle('active', button.dataset.fontScale === state.settings.fontScale));
   $('#toggle-home-news').checked = state.settings.showNews !== false;
   $('#toggle-reduced-motion').checked = Boolean(state.settings.reducedMotion);
+  $('#toggle-home-studies').checked = state.settings.showHomeStudies !== false;
+  for (const key of ['surface', 'fontFamily', 'contentWidth', 'startPage']) $(`[data-preference="${key}"]`).value = state.settings[key] || defaultState.settings[key];
 }
 
 function renderHabitManager() {
@@ -1128,44 +1177,50 @@ function updatePipTimer() {
   const label = pipWindow.document.getElementById('pip-timer-label');
   if (display) display.textContent = formatTimer();
   if (action) action.textContent = timerRunning ? 'Pausar' : 'Começar';
-  if (label) label.textContent = timerPreset <= 5 ? 'PAUSA' : timerRunning ? 'FOCO EM ANDAMENTO' : 'FOCO PAUSADO';
+  if (label) label.textContent = timerMode === 'break' ? 'PAUSA' : timerRunning ? 'FOCO EM ANDAMENTO' : 'FOCO PAUSADO';
 }
 
 function updateTimerDisplay() {
   const formatted = formatTimer();
   $('#timer-display').textContent = formatted;
   $('#timer-start').textContent = timerRunning ? 'Pausar' : 'Começar';
-  $('#timer-mode').textContent = timerPreset <= 5 ? 'Pausa consciente' : timerRunning ? 'Foco em andamento' : 'Hora de focar';
+  $('#timer-mode').textContent = !timerSeconds ? 'Ciclo concluído' : timerMode === 'break' ? 'Pausa consciente' : timerRunning ? 'Foco em andamento' : 'Hora de focar';
   $('#floating-timer-display').textContent = formatted;
   $('#floating-timer-toggle').textContent = timerRunning ? 'Pausar' : 'Retomar';
-  $('#floating-timer-label').textContent = timerPreset <= 5 ? 'PAUSA' : timerRunning ? 'FOCO EM ANDAMENTO' : 'FOCO PAUSADO';
+  $('#floating-timer-label').textContent = !timerSeconds ? 'CICLO CONCLUÍDO' : timerMode === 'break' ? 'PAUSA' : timerRunning ? 'FOCO EM ANDAMENTO' : 'FOCO PAUSADO';
+  document.title = timerRunning ? `${formatted} · MindFlow` : 'MindFlow';
   updatePipTimer();
 }
 
 function setTimerRunning(running) {
-  if (timerRunning === running) return;
-  timerRunning = running;
-  clearInterval(timerInterval);
-  if (running) {
-    $('#floating-timer').hidden = false;
-    timerInterval = setInterval(() => {
-      timerSeconds -= 1;
-      if (timerSeconds <= 0) completeTimer(); else updateTimerDisplay();
-    }, 1000);
+  return dispatchFocus({ action: running ? 'start' : 'pause' });
+}
+function applyFocusSnapshot(value) {
+  const wasRunning = timerRunning;
+  timerSeconds = value.seconds; timerPreset = value.minutes; timerRunning = value.running; timerMode = value.mode;
+  if (timerRunning && !wasRunning) $('#floating-timer').hidden = false;
+  if (value.completedId && !Object.hasOwn(state.focusSessions, value.completedId)) {
+    const day = new Date().toLocaleDateString('en-CA');
+    state.focusSessions[value.completedId] = day;
+    if (value.mode === 'focus') state.focusMinutes[day] = (state.focusMinutes[day] || 0) + value.minutes;
+    save(); renderHistoryPreview(); renderHistory(); updateSummary();
+    showToast(value.mode === 'focus' ? `${value.minutes} ${value.minutes === 1 ? 'minuto de foco registrado' : 'minutos de foco registrados'}.` : 'Pausa concluída.');
   }
   updateTimerDisplay();
 }
-
-function completeTimer() {
-  clearInterval(timerInterval); timerRunning = false;
-  if (timerPreset > 5) {
-    state.focusMinutes[DATE_KEY] = (state.focusMinutes[DATE_KEY] || 0) + timerPreset;
-    save(); renderHistoryPreview(); renderHistory(); updateSummary(); showToast(`${timerPreset} minutos de foco registrados. Bom trabalho.`);
-  } else showToast('Pausa concluída. Respire e volte com intenção.');
-  timerSeconds = timerPreset * 60; updateTimerDisplay();
+async function dispatchFocus(command) {
+  try {
+    const api = window.mindflowDesktop;
+    let snapshot;
+    if (api) snapshot = await api.timerAction(command);
+    else if (command.action === 'configure') snapshot = browserClock.configure(command.minutes, command.mode);
+    else snapshot = browserClock[command.action]();
+    applyFocusSnapshot(snapshot);
+  } catch (error) { showToast(error.message || 'Não foi possível ajustar o timer.'); }
 }
 
 async function openTimerPopout() {
+  if (window.mindflowDesktop) { await window.mindflowDesktop.openMini(); return; }
   if (!('documentPictureInPicture' in window)) {
     showToast('Seu navegador não suporta mini janela. Use o timer flutuante no canto da página.'); return;
   }
@@ -1182,12 +1237,38 @@ async function openTimerPopout() {
 }
 
 function bindFocus() {
+  if (!focusBound) {
+    focusBound = true;
+    const api = window.mindflowDesktop;
+    if (api) {
+      api.onTimer(applyFocusSnapshot);
+      api.getTimer().then(async value => {
+        if (!value.configured) value = await api.timerAction({ action: 'configure', minutes: Math.max(1, Math.min(180, Math.round(Number(state.settings.focusDuration) || 25))), mode: 'focus' });
+        applyFocusSnapshot(value); $('#focus-duration').value = value.minutes; $('#focus-kind').value = value.mode;
+      }).catch(() => showToast('Não foi possível conectar ao timer. Reabra o aplicativo.'));
+    }
+    else {
+      browserClock = new FocusClock(); browserClock.configure(Math.max(1, Math.min(180, Math.round(Number(state.settings.focusDuration) || 25))));
+      applyFocusSnapshot(browserClock.snapshot());
+      timerInterval = setInterval(() => { if (browserClock.running) applyFocusSnapshot(browserClock.snapshot()); }, 250);
+    }
+  }
   $('#timer-start').onclick = () => setTimerRunning(!timerRunning);
-  $('#timer-reset').onclick = () => { setTimerRunning(false); timerSeconds = timerPreset * 60; updateTimerDisplay(); };
+  $('#timer-reset').onclick = () => dispatchFocus({ action: 'reset' });
   $$('.focus-presets button').forEach(button => button.onclick = () => {
-    setTimerRunning(false); timerPreset = Number(button.dataset.minutes); timerSeconds = timerPreset * 60;
-    $$('.focus-presets button').forEach(item => item.classList.toggle('active', item === button)); updateTimerDisplay();
+    $('#focus-duration').value = button.dataset.minutes;
+    $('#focus-kind').value = button.dataset.minutes === '5' ? 'break' : 'focus';
+    dispatchFocus({ action: 'configure', minutes: Number(button.dataset.minutes), mode: $('#focus-kind').value });
+    $$('.focus-presets button').forEach(item => item.classList.toggle('active', item === button));
   });
+  $('#focus-duration').value = timerPreset;
+  $('#focus-kind').value = timerMode;
+  $('#focus-duration-form').onsubmit = event => {
+    event.preventDefault(); const minutes = Number($('#focus-duration').value);
+    if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
+    state.settings.focusDuration = minutes; save();
+    dispatchFocus({ action: 'configure', minutes, mode: $('#focus-kind').value });
+  };
   $$('.ritual-item input').forEach(input => {
     input.checked = Boolean(state.rituals[input.dataset.ritual]);
     input.onchange = event => { state.rituals[event.target.dataset.ritual] = event.target.checked; save(); };
@@ -1200,8 +1281,8 @@ function bindFocus() {
   $('#hide-floating-timer').onclick = () => { $('#floating-timer').hidden = true; };
 }
 
-function newsEndpoint(topic) {
-  return `/api/news?topic=${encodeURIComponent(NEWS_TOPICS[topic] ? topic : 'brazil')}`;
+function newsEndpoint(topic, force = false) {
+  return `/api/news?topic=${encodeURIComponent(NEWS_TOPICS[topic] ? topic : 'brazil')}${force ? '&refresh=1' : ''}`;
 }
 
 function formatNewsDate(value) {
@@ -1211,34 +1292,18 @@ function formatNewsDate(value) {
   if (Number.isNaN(date.getTime())) return 'Data não informada';
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date);
 }
-function updateNewsPosition(list) {
-  const count = list.querySelectorAll('.news-item').length;
-  const index = count ? Math.min(count - 1, Math.max(0, Math.round(list.scrollLeft / Math.max(1, list.clientWidth)))) : 0;
-  const page = list.id === 'news-list-page';
-  $(`#news-position${page ? '-page' : ''}`).textContent = count ? `${index + 1} / ${count}` : '—';
-  $(`#news-prev${page ? '-page' : ''}`).disabled = !count || index === 0;
-  $(`#news-next${page ? '-page' : ''}`).disabled = !count || index === count - 1;
-}
-function moveNews(list, step) {
-  const count = list.querySelectorAll('.news-item').length;
-  if (!count) return;
-  const current = Math.round(list.scrollLeft / Math.max(1, list.clientWidth));
-  const next = Math.min(count - 1, Math.max(0, current + step));
-  list.scrollTo({ left: next * list.clientWidth, behavior: state.settings.reducedMotion ? 'auto' : 'smooth' });
-  $(`#news-position${list.id === 'news-list-page' ? '-page' : ''}`).textContent = `${next + 1} / ${count}`;
-}
 function renderNews(items, { loading = false, error = false, serverMissing = false } = {}) {
   const lists = [$('#news-list'), $('#news-list-page')];
-  if (loading) { lists.forEach(list => { list.innerHTML = '<div class="news-skeleton" aria-label="Buscando destaques"><i></i><i></i><i></i></div>'; updateNewsPosition(list); }); return; }
+  if (loading) { lists.forEach(list => { list.innerHTML = '<div class="news-skeleton" aria-label="Buscando destaques"><i></i><i></i><i></i></div>'; }); return; }
   if (error) {
     lists.forEach(list => { list.innerHTML = serverMissing
       ? '<div class="news-error"><strong>Ative as notícias do seu espaço</strong><p>O Live Server abre a página, mas não fornece as notícias. Na pasta do MindFlow, abra <strong>start.bat</strong> ou execute <code>npm.cmd start</code> e mantenha o terminal aberto. Depois, tente novamente aqui.</p><p>Você pode continuar neste endereço para manter seus dados. Ao trocar de endereço ou porta, use Exportar dados e Importar backup.</p><button class="secondary-button" data-retry-news>Tentar novamente</button></div>'
-      : '<div class="news-error"><strong>Os jornais não responderam agora.</strong><p>Confira sua conexão e tente novamente em alguns instantes.</p><button class="text-button" data-retry-news>Tentar novamente</button></div>'; updateNewsPosition(list); });
+      : '<div class="news-error"><strong>Os jornais não responderam agora.</strong><p>Confira sua conexão e tente novamente em alguns instantes.</p><button class="text-button" data-retry-news>Tentar novamente</button></div>'; });
     $$('[data-retry-news]').forEach(button => button.onclick = () => loadNews({ force: true })); return;
   }
   const news = (Array.isArray(items) ? items : []).filter(item => safeHttp(item.url));
   lists.forEach(list => {
-    const limit = list.id === 'news-list' ? 5 : 10;
+    const limit = list.id === 'news-list' ? 3 : 10;
     list.innerHTML = news.length ? news.slice(0, limit).map(article => {
       const image = safeHttp(article.image);
       const cover = image.startsWith('https://')
@@ -1248,14 +1313,13 @@ function renderNews(items, { loading = false, error = false, serverMissing = fal
     }).join('') : '<p class="news-loading">Nenhuma manchete publicada nas últimas 48 horas neste tema. Experimente outro assunto.</p>';
     list.scrollLeft = 0;
     $$('img[data-news-cover]', list).forEach(image => { image.onerror = () => { image.closest('.news-cover').innerHTML = '<span class="news-cover-empty">Capa indisponível</span>'; }; });
-    updateNewsPosition(list);
   });
 }
 function setNewsStatus(message) {
   [$('#news-status'), $('#news-status-page')].forEach(status => { status.textContent = message; });
 }
-async function fetchNewsPayload(topic, signal) {
-  const path = newsEndpoint(topic);
+async function fetchNewsPayload(topic, signal, force = false) {
+  const path = newsEndpoint(topic, force);
   const endpoints = [path];
   if (['localhost', '127.0.0.1'].includes(location.hostname) && location.port !== LOCAL_SERVER_PORT) endpoints.push(`http://127.0.0.1:${LOCAL_SERVER_PORT}` + path);
   let serverMissing = false;
@@ -1277,32 +1341,34 @@ async function loadNews({ force = false } = {}) {
   const topic = Object.hasOwn(NEWS_TOPICS, state.settings.newsTopic) ? state.settings.newsTopic : 'brazil';
   state.settings.newsTopic = topic;
   const cached = state.newsCache[topic];
-  const validCache = [2, 3].includes(cached?.version) && cached.items?.length;
-  const fresh = cached?.version === 3 && validCache && Date.now() - cached.savedAt < 15 * 60 * 1000;
+  const validCache = [2, 3, 4].includes(cached?.version) && cached.items?.length;
+  const fresh = cached?.version === 4 && validCache && Date.now() - cached.savedAt < 5 * 60 * 1000;
   // Cancel before an early cache return so an older topic cannot overwrite the selected one.
   newsRequest?.abort();
   newsRequest = null;
+  [$('#refresh-news'), $('#refresh-news-page')].forEach(button => { button.disabled = false; });
   if (validCache) { renderNews(cached.items); setNewsStatus(`Salvo em ${formatNewsDate(cached.updatedAt)}`); }
   if (!force && fresh) return;
   const controller = new AbortController(); newsRequest = controller;
+  [$('#refresh-news'), $('#refresh-news-page')].forEach(button => { button.disabled = true; });
   const timeout = setTimeout(() => controller.abort(), 10000);
   if (!validCache) renderNews([], { loading: true });
   setNewsStatus(validCache ? 'Atualizando os destaques…' : 'Buscando nos jornais…');
   try {
-    const payload = await fetchNewsPayload(topic, controller.signal);
+    const payload = await fetchNewsPayload(topic, controller.signal, force);
     if (newsRequest !== controller) return;
     const items = payload.articles.filter(article => article.title && safeHttp(article.url)).slice(0, 10);
     if (payload.stale) {
       renderNews(items); setNewsStatus(`Sem atualização · conteúdo de ${formatNewsDate(payload.updatedAt)}`); return;
     }
     if (!items.length && validCache) { renderNews(cached.items); setNewsStatus('Sem novas manchetes · última consulta salva'); return; }
-    state.newsCache[topic] = { version: 3, savedAt: Date.now(), updatedAt: payload.updatedAt, items };
+    state.newsCache[topic] = { version: 4, savedAt: Date.now(), updatedAt: payload.updatedAt, items };
     save({ localOnly: true }); renderNews(items); setNewsStatus(`Consultado em ${formatNewsDate(payload.updatedAt)}`);
   } catch (error) {
     if (newsRequest !== controller) return;
     if (validCache) { renderNews(cached.items); setNewsStatus(`Sem conexão · salvo em ${formatNewsDate(cached.updatedAt)}`); }
     else { renderNews([], { error: true, serverMissing: error.serverMissing }); setNewsStatus('Atualização indisponível'); }
-  } finally { clearTimeout(timeout); if (newsRequest === controller) newsRequest = null; }
+  } finally { clearTimeout(timeout); if (newsRequest === controller) { newsRequest = null; [$('#refresh-news'), $('#refresh-news-page')].forEach(button => { button.disabled = false; }); } }
 }
 
 function renderHistoryPreview() {
@@ -1335,6 +1401,7 @@ function renderHistory() {
   $('#history-days-count').textContent = recordedDays;
   $('#history-week-average').textContent = average === null ? '—' : `${average}%`;
   $('#history-week-focus').textContent = `${focus} min`;
+  renderHistoryChart();
   $('#history-list').innerHTML = summaries.map(day => `
     <button class="history-day ${day.day === selectedHistoryDate ? 'active' : ''} ${day.hasData ? 'recorded' : ''}" type="button" data-history-date="${escapeHTML(day.day)}">
       <span class="history-day-date">${escapeHTML(day.day === DATE_KEY ? 'Hoje' : formatHistoryDate(day.day, { weekday: 'short', day: 'numeric', month: 'short' }))}</span>
@@ -1363,6 +1430,24 @@ function renderHistory() {
   const editTodayButton = $('[data-route="hoje"]', $('#history-detail'));
   if (editTodayButton) editTodayButton.onclick = () => setRoute('hoje');
 }
+function renderHistoryChart() {
+  const chart = state.settings.historyView === 'chart';
+  $('#history-chart-card').hidden = !chart;
+  $('#history-list-card').hidden = chart;
+  $$('[data-history-view]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.historyView === (chart ? 'chart' : 'list'))));
+  const count = $('#history-chart-period').value === '30' ? 30 : 7;
+  const metric = $('#history-chart-metric').value;
+  const days = recentDateKeys(count).sort().map(daySummary);
+  const maximum = metric === 'focus' ? Math.max(30, ...days.map(day => day.focus)) : 100;
+  $('#history-chart-scale').textContent = metric === 'focus' ? `Foco em minutos · máximo da escala: ${maximum} min` : 'Hábitos concluídos · escala de 0 a 100%';
+  $('#history-chart').innerHTML = days.map(day => {
+    const value = metric === 'focus' ? day.focus : day.percentage;
+    const label = day.hasData ? `${value}${metric === 'focus' ? ' min' : '%'}` : 'sem registro';
+    return `<button class="history-bar ${day.day === selectedHistoryDate ? 'selected' : ''}" data-chart-day="${day.day}" aria-label="${escapeHTML(formatHistoryDate(day.day))}: ${label}" title="${escapeHTML(formatHistoryDate(day.day))}: ${label}"><span class="bar-value">${day.hasData ? value : '—'}</span><span class="bar-track"><i style="height:${Math.max(2, value / maximum * 100)}%" class="${day.hasData ? '' : 'no-record'}"></i></span><small>${day.day.slice(8)}</small></button>`;
+  }).join('');
+  $$('[data-chart-day]').forEach(button => button.onclick = () => { selectedHistoryDate = button.dataset.chartDay; renderHistory(); });
+}
+
 function renderFinance() {
   const finance = state.finance;
   const { entries, income, expenses } = financeSummary(finance.transactions, financeMonth);
@@ -1481,6 +1566,7 @@ function renderHomeBillReminder() {
   const soon = bills.filter(bill => bill.dueDate <= horizon.toLocaleDateString('en-CA')).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   $('#home-bill-reminder').hidden = !soon.length;
   if (soon.length) { homeBillMonth = soon[0].month; $('#home-bill-message').textContent = `${soon.length} ${soon.length === 1 ? 'conta' : 'contas'} em atraso ou a vencer nos próximos 7 dias · ${formatMoney(soon.reduce((sum, bill) => sum + bill.amountCents, 0))}`; }
+  $('#home-bill-list').innerHTML = soon.slice(0, 3).map(bill => `<div class="home-bill-item"><span>${bill.dueDate < DATE_KEY ? 'Em atraso' : 'Vence ' + formatTaskDate(bill.dueDate)}</span><strong>${escapeHTML(bill.title)}</strong><b>${formatMoney(bill.amountCents)}</b></div>`).join('');
 }
 function renderCare() {
   const active = state.care.goals.filter(goal => !goal.archived);
@@ -1535,6 +1621,7 @@ function setRoute(route) {
   setMenuOpen(false);
   if (window.location.hash !== `#${route}`) window.location.hash = route;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (!newsRequest && (route === 'noticias' || route === 'inicio' && state.settings.showNews !== false)) loadNews({ force: false });
 }
 
 function renderAvatarPicker() {
@@ -2107,12 +2194,36 @@ function bindDialogs() {
     if (!save()) return;
     taskDialog.close(); renderAll(); showToast('Tarefa excluída.');
   };
-  $('#open-learning-form').onclick = () => { $('#learning-form').reset(); $('#learning-type-input').value = activeLibrary; openDialog('learning-dialog'); $('#learning-title-input').focus(); };
+  $('#open-learning-form').onclick = () => openLearningEditor();
   $('#learning-form').onsubmit = event => {
     event.preventDefault();
-    state.learning.unshift({ id: makeId(), title: $('#learning-title-input').value.trim(), type: $('#learning-type-input').value, category: $('#learning-category-input').value.trim() || 'Geral', author: $('#learning-author-input').value.trim(), total: Number($('#learning-total-input').value) || 0, current: Number($('#learning-current-input').value) || 0 });
-    activeLibrary = $('#learning-type-input').value; save(); learningDialog.close(); renderLearning(); updateSummary(); showToast('Item salvo na sua biblioteca.');
+    const id = $('#learning-id-input').value;
+    const existing = state.learning.find(item => item.id === id);
+    const total = Number($('#learning-total-input').value), current = Number($('#learning-current-input').value);
+    if (!Number.isFinite(total) || !Number.isFinite(current) || total < 1 || current < 0 || current > total) { showToast('Informe o total e um progresso entre zero e esse total.'); return; }
+    const item = normalizeLearningItem({ id: id || makeId(), title: $('#learning-title-input').value, type: $('#learning-type-input').value, category: $('#learning-category-input').value, author: $('#learning-author-input').value, description: $('#learning-description-input').value, color: $('#learning-color-input').value, unit: $('#learning-unit-input').value, url: $('#learning-url-input').value, total, current, updatedAt: new Date().toISOString() });
+    if (existing) Object.assign(existing, item); else state.learning.unshift(item);
+    if (!save()) return;
+    activeLibrary = 'all'; activeLearningCategory = 'all'; learningStatus = 'all'; learningSearch = ''; $('#learning-search').value = ''; $('#learning-status-filter').value = 'all';
+    learningDialog.close(); renderLearning(); updateSummary(); showToast('Estudo salvo.');
   };
+  $('#learning-delete').onclick = () => {
+    const id = $('#learning-id-input').value;
+    if (!id || !confirm('Excluir este estudo da biblioteca?')) return;
+    state.learning = state.learning.filter(item => item.id !== id);
+    if (!save()) return;
+    learningDialog.close(); renderLearning(); updateSummary();
+  };
+  $('#learning-progress-form').onsubmit = event => {
+    event.preventDefault();
+    const item = state.learning.find(entry => entry.id === $('#progress-item-id').value);
+    const total = Number($('#progress-total').value), current = Number($('#progress-current').value);
+    if (!item || !Number.isFinite(total) || !Number.isFinite(current) || total < 1 || current < 0 || current > total) { showToast('O progresso deve estar entre zero e o total.'); return; }
+    item.total = total; item.current = current; item.updatedAt = new Date().toISOString();
+    if (!save()) return;
+    $('#learning-progress-dialog').close(); renderLearning(); updateSummary(); showToast(current === total ? 'Estudo concluído. Mais um passo no seu repertório.' : 'Progresso registrado.');
+  };
+  $('#progress-complete').onclick = () => { $('#progress-current').value = $('#progress-total').value; $('#learning-progress-form').requestSubmit(); };
   const openUpdate = () => { $('#update-form').reset(); openDialog('update-dialog'); $('#update-text-input').focus(); };
   [$('#add-update'), $('#add-update-home')].filter(Boolean).forEach(button => { button.onclick = openUpdate; });
   $('#update-form').onsubmit = event => {
@@ -2300,6 +2411,10 @@ function bindApp() {
   $$('[data-task-view]').forEach(button => button.onclick = () => { state.settings.taskView = button.dataset.taskView; save(); renderTaskView(); });
   $$('.library-tab').forEach(tab => tab.onclick = () => { activeLibrary = tab.dataset.library; activeLearningCategory = 'all'; renderLearning(); });
   $('#learning-category-filter').onchange = event => { activeLearningCategory = event.target.value; renderLearning(); };
+  $('#learning-search').oninput = event => { learningSearch = event.target.value.trim().toLocaleLowerCase('pt-BR'); renderLearning(); };
+  $('#learning-status-filter').onchange = event => { learningStatus = event.target.value; renderLearning(); };
+  $$('[data-history-view]').forEach(button => button.onclick = () => { state.settings.historyView = button.dataset.historyView; save(); renderHistory(); });
+  ['#history-chart-period', '#history-chart-metric'].forEach(selector => $(selector).onchange = renderHistoryChart);
   const setTopic = topic => {
     state.settings.newsTopic = topic;
     [$('#news-topic'), $('#news-topic-page')].filter(Boolean).forEach(select => { select.value = topic; });
@@ -2307,17 +2422,6 @@ function bindApp() {
   };
   [$('#news-topic'), $('#news-topic-page')].filter(Boolean).forEach(select => { select.value = state.settings.newsTopic || 'brazil'; select.onchange = event => setTopic(event.target.value); });
   [$('#refresh-news'), $('#refresh-news-page')].filter(Boolean).forEach(button => { button.onclick = () => loadNews({ force: true }); });
-  for (const [suffix, id] of [['', 'news-list'], ['-page', 'news-list-page']]) {
-    const list = $(`#${id}`);
-    $(`#news-prev${suffix}`).onclick = () => moveNews(list, -1);
-    $(`#news-next${suffix}`).onclick = () => moveNews(list, 1);
-    list.onscroll = () => updateNewsPosition(list);
-    list.onkeydown = event => {
-      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        event.preventDefault(); moveNews(list, event.key === 'ArrowLeft' ? -1 : 1);
-      }
-    };
-  }
   $('#notes-search').oninput = event => { notesSearch = event.target.value; renderNotes(); };
   $('#notes-category-filter').onchange = event => { notesCategory = event.target.value; renderNotes(); };
   const updatePreference = (key, value) => { state.settings[key] = value; save(); applyTheme(); renderPreferences(); };
@@ -2326,14 +2430,36 @@ function bindApp() {
   $$('[data-font-scale]').forEach(button => button.onclick = () => updatePreference('fontScale', button.dataset.fontScale));
   $('#toggle-home-news').onchange = event => updatePreference('showNews', event.target.checked);
   $('#toggle-reduced-motion').onchange = event => updatePreference('reducedMotion', event.target.checked);
+  $('#toggle-home-studies').onchange = event => updatePreference('showHomeStudies', event.target.checked);
+  $$('[data-preference]').forEach(select => select.onchange = event => updatePreference(select.dataset.preference, event.target.value));
   $('#next-quote').onclick = () => { state.settings.quoteOffset = Number(state.settings.quoteOffset || 0) + 1; save(); renderQuote(); };
-  bindDialogs(); bindFinance(); bindCare(); bindStorage(); bindSyncConflict();
+  bindDialogs(); bindFinance(); bindCare(); bindStorage(); bindSyncConflict(); bindDesktopUpdates();
   const routeFromHash = () => {
     const route = window.location.hash.slice(1);
     if (/^[a-z]+$/.test(route)) setRoute(route);
   };
   window.addEventListener('hashchange', routeFromHash);
   routeFromHash();
+  if (!window.location.hash) setRoute(state.settings.startPage || 'inicio');
+}
+
+function bindDesktopUpdates() {
+  const api = window.mindflowDesktop;
+  if (!api) { $('#app-update-message').textContent = 'Você está usando o navegador. No app Windows, as próximas versões são baixadas automaticamente.'; $('#app-update-check').hidden = true; return; }
+  const render = value => {
+    $('#app-version').textContent = `MindFlow ${value.version}`;
+    $('#app-update-message').textContent = value.message;
+    $('#app-update-check').disabled = ['checking', 'downloading', 'unavailable', 'ready'].includes(value.status);
+    $('#app-update-install').hidden = value.status !== 'ready';
+  };
+  api.onUpdate(render); api.getUpdate().then(render);
+  $('#app-update-check').onclick = () => api.checkUpdates().then(render);
+  $('#app-update-install').onclick = async () => {
+    if (timerRunning) { showToast('Pause ou conclua seu foco antes de reiniciar.'); return; }
+    await flushSharedState();
+    if (sharedPending || sharedSaving || sharedConflict) { showToast('Aguarde seus dados serem salvos antes de reiniciar.'); return; }
+    if (!await api.installUpdate()) showToast('A atualização ainda não está pronta para instalar.');
+  };
 }
 
 initializeSharedState().catch(() => setSyncStatus('Dados salvos neste navegador')).finally(() => {
@@ -2352,3 +2478,10 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) refr
 setInterval(refreshCalendarDay, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshSharedState(); });
 setInterval(refreshSharedState, 15000);
+function refreshVisibleNews(force = false) {
+  if (document.hidden) return;
+  const route = $('.view.active')?.id;
+  if (!newsRequest && (route === 'noticias' || route === 'inicio' && state.settings.showNews !== false)) loadNews({ force });
+}
+setInterval(() => refreshVisibleNews(true), 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => refreshVisibleNews(false));

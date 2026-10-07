@@ -11,7 +11,7 @@ const PORT = Number(process.env.MINDFLOW_PORT) || 3177;
 const ROOT = __dirname;
 const store = createStateStore();
 const TYPES = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp' };
-const PUBLIC_FILES = new Set(['index.html', 'app.js', 'visuals.js', 'styles.css', 'manifest.webmanifest']);
+const PUBLIC_FILES = new Set(['index.html', 'app.js', 'visuals.js', 'focus-clock.js', 'styles.css', 'manifest.webmanifest']);
 
 function requestedFile(url = '/') {
   try {
@@ -133,7 +133,7 @@ const server = http.createServer(async (request, response) => {
       return;
     }
     if (address.pathname === '/api/news' && ['GET', 'HEAD'].includes(request.method)) {
-      try { const payload = await getNews(address.searchParams.get('topic')); sendJson(response, payload.error ? 503 : 200, payload, request.method === 'HEAD'); }
+      try { const payload = await getNews(address.searchParams.get('topic'), { force: address.searchParams.get('refresh') === '1' }); sendJson(response, payload.error ? 503 : 200, payload, request.method === 'HEAD'); }
       catch { sendJson(response, 503, { error: 'news_unavailable', articles: [] }); }
       return;
     }

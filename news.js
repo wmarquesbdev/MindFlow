@@ -17,7 +17,7 @@ const FEEDS = {
     ['g1 Mundo', 'https://g1.globo.com/rss/g1/mundo/', 4]
   ]
 };
-const CACHE_MS = 15 * 60 * 1000;
+const CACHE_MS = 5 * 60 * 1000;
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
 const cache = new Map();
 const pending = new Map();
@@ -114,7 +114,7 @@ function selectHeadlines(items, now = Date.now()) {
   return selected.map(({ rank, timestamp, score, editorialWeight, ...item }) => item);
 }
 async function readFeed([source, url, editorialWeight = 0]) {
-  const response = await fetch(url, { signal: AbortSignal.timeout(6500), headers: { 'User-Agent': 'MindFlow/2.7 RSS Reader', Accept: 'application/rss+xml, application/xml, text/xml' } });
+  const response = await fetch(url, { signal: AbortSignal.timeout(6500), headers: { 'User-Agent': 'MindFlow/2.8 RSS Reader', Accept: 'application/rss+xml, application/xml, text/xml' } });
   if (!response.ok) throw new Error(`Feed HTTP ${response.status}`);
   const reader = response.body.getReader();
   const chunks = []; let size = 0;
@@ -128,10 +128,10 @@ async function readFeed([source, url, editorialWeight = 0]) {
   } finally { reader.releaseLock(); }
   return parseFeed(Buffer.concat(chunks).toString('utf8'), source).map(item => ({ ...item, editorialWeight }));
 }
-async function getNews(topic = 'brazil') {
+async function getNews(topic = 'brazil', { force = false } = {}) {
   topic = Object.hasOwn(FEEDS, topic) ? topic : 'brazil';
   const saved = cache.get(topic);
-  if (saved && Date.now() - saved.savedAt < CACHE_MS) return { ...saved.payload, cached: true };
+  if (!force && saved && Date.now() - saved.savedAt < CACHE_MS) return { ...saved.payload, cached: true };
   if (pending.has(topic)) return pending.get(topic);
   const job = (async () => {
     const results = await Promise.allSettled(FEEDS[topic].map(readFeed));

@@ -22,7 +22,11 @@ Abra `http://127.0.0.1:3177`. No PowerShell, use `npm.cmd` se a execução de sc
 
 ## O que tem
 
-Hábitos por mês, tarefas em lista ou Kanban, notas, estudos, Pomodoro, notícias com capas e resumos dos feeds, autocuidado e controle simples de conta, Pix, boletos e cartão. O perfil aceita oito retratos de personagens ou sua foto. Comprovantes podem ser anexados; a leitura local de documentos apenas sugere valores e vencimentos — confirme sempre com o original.
+Hábitos por mês com capas, tarefas em lista ou Kanban, notas, estudos com progresso, histórico em gráfico, Pomodoro com mini timer na área de trabalho e notícias atualizadas a cada 5 minutos enquanto a página está em uso. Personalize cores, leitura e página inicial. Inclui autocuidado e controle simples de conta, Pix, boletos e cartão. Comprovantes podem ser anexados; a leitura local apenas sugere valores e vencimentos — confirme sempre com o original.
+
+## Atualizar
+
+A partir da **2.8.0 instalada no Windows**, o app verifica e baixa novas versões em segundo plano. Em **Personalizar**, consulte o estado e reinicie para aplicar. Quem usa 2.7 ou anterior precisa instalar a 2.8 uma vez. Durante o foco, minimize o app para manter o timer ativo; fechar o aplicativo encerra o timer.
 
 ## Seus dados
 
@@ -38,5 +42,7 @@ npm.cmd run make
 ```
 
 O instalador gerado fica em `out/make/squirrel.windows/x64/`. Artes: [pixel art](assets/pixel/ART.md). Licença [MIT](LICENSE).
+
+Para publicar, use `powershell -ExecutionPolicy Bypass -File scripts/release.ps1` após o build e o push. O script publica juntos instalador, pacote `.nupkg` e `RELEASES`, necessários para atualizar automaticamente. Requer GitHub CLI autenticado; veja o script antes de executar.
 
 Os retratos de personagens são fan art gerada para o projeto, não imagens oficiais. Personagens e marcas pertencem a seus respectivos titulares; o MindFlow não é afiliado a eles.

@@ -81,3 +81,14 @@ test('API accepts local Live Server origins and never grants a remote site acces
     assert.equal(remote.headers.get('access-control-allow-origin'), null);
   } finally { global.fetch = originalFetch; await new Promise(resolve => server.close(resolve)); }
 });
+test('news cache expires after five minutes and manual refresh bypasses it', async () => {
+  const originalFetch = global.fetch, originalNow = Date.now; let calls = 0;
+  try {
+    global.fetch = async () => { calls++; return new Response('<rss>' + item('Atualizada ' + calls, 'https://example.com/fresh-' + calls, new Date().toUTCString()) + '</rss>'); };
+    await getNews('technology', {force:true}); const first = calls;
+    await getNews('technology'); assert.equal(calls, first);
+    await getNews('technology', {force:true}); assert.ok(calls > first); const second = calls;
+    Date.now = () => originalNow() + 301000;
+    await getNews('technology'); assert.ok(calls > second);
+  } finally { global.fetch = originalFetch; Date.now = originalNow; }
+});

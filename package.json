@@ -1,6 +1,6 @@
 {
   "name": "mindflow",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "productName": "MindFlow",
   "author": "MindFlow contributors",
@@ -10,7 +10,7 @@
     "start": "node server.js",
     "desktop": "electron .",
     "make": "electron-forge make",
-    "check": "node --check app.js && node --check visuals.js && node --check news.js && node --check storage.js && node --check documents.js && node --check server.js && node --check desktop.js && node --check forge.config.js",
+    "check": "node --check app.js && node --check visuals.js && node --check news.js && node --check storage.js && node --check documents.js && node --check server.js && node --check desktop.js && node --check forge.config.js && node --check preload.js && node --check focus-clock.js && node --check desktop-updates.js && node --check mini-timer.js",
     "test": "node --test tests/*.test.js"
   },
   "engines": {
