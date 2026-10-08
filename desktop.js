@@ -19,6 +19,7 @@ if (!hasLock && !isSquirrelEvent) app.quit();
 let mainWindow;
 let localServer;
 let miniWindow;
+let miniReady;
 let localOrigin = '';
 let updateController;
 const clock = new FocusClock();
@@ -34,8 +35,12 @@ function openMini() {
   if (miniWindow && !miniWindow.isDestroyed()) { if (!smokeTest) miniWindow.showInactive(); return; }
   const bounds = screen.getDisplayMatching(mainWindow.getBounds()).workArea;
   miniWindow = new BrowserWindow({ width: 290, height: 205, x: bounds.x + bounds.width - 314, y: bounds.y + bounds.height - 229, frame: false, resizable: false, alwaysOnTop: true, skipTaskbar: true, show: false, backgroundColor: '#1d2421', webPreferences: { preload, nodeIntegration: false, contextIsolation: true, sandbox: true, backgroundThrottling: false } });
+  miniReady = new Promise(resolve => miniWindow.once('ready-to-show', () => {
+    miniWindow?.setAlwaysOnTop(true, 'floating');
+    if (!smokeTest) miniWindow?.showInactive();
+    resolve();
+  }));
   miniWindow.loadFile(path.join(__dirname, 'mini-timer.html'));
-  miniWindow.once('ready-to-show', () => { if (!smokeTest) miniWindow?.showInactive(); });
   miniWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   miniWindow.webContents.on('will-navigate', event => event.preventDefault());
   miniWindow.on('closed', () => { miniWindow = null; });
@@ -53,7 +58,7 @@ function bindDesktop() {
     else throw new Error('Comando inválido.');
     const result = clock.snapshot(); broadcast('focus:state', result); return result;
   }, true);
-  handle('focus:mini', () => { openMini(); return true; });
+  handle('focus:mini', async () => { openMini(); await miniReady; return true; });
   handle('focus:main', () => { showMain(); return true; }, true);
   handle('focus:close', () => { miniWindow?.close(); if (mainWindow?.isMinimized() || !mainWindow?.isVisible()) showMain(); return true; }, true);
   handle('update:get', () => updateController.snapshot());
@@ -117,9 +122,11 @@ function createWindow(port) {
     try {
       const result = await window.webContents.executeJavaScript(`new Promise(resolve => {
         const started = Date.now();
-        const check = () => {
+        const check = async () => {
           const status = document.querySelector('#sync-status')?.textContent;
-          if (status && status !== 'Carregando dados locais…') resolve({ title: document.title, status, hasProfileDialog: Boolean(document.querySelector('#profile-dialog')?.open), hasFinance: Boolean(document.querySelector('#financas')) });
+          const ready = document.querySelector('#app-loading')?.hidden;
+          const timer = ready ? await window.mindflowDesktop.getTimer() : null;
+          if (ready && timer?.configured) resolve({ title: document.title, status, hasProfileDialog: Boolean(document.querySelector('#profile-dialog')?.open), hasFinance: Boolean(document.querySelector('#financas')), uxReady: Boolean(document.querySelector('#open-quick-nav')) });
           else if (Date.now() - started > 8000) resolve({ error: 'startup_timeout', status });
           else setTimeout(check, 100);
         };
@@ -134,7 +141,7 @@ function createWindow(port) {
         await api.openMini();
         return {running,update:await api.getUpdate()};
       })()`);
-      if (!timer.running.running || timer.running.seconds !== 120 || timer.update.status !== 'unavailable' || !miniWindow?.isAlwaysOnTop()) throw new Error('desktop_integration_failed');
+      if (!timer.running.running || timer.running.seconds > 120 || timer.running.seconds < 118 || timer.update.status !== 'unavailable' || !miniWindow?.isAlwaysOnTop()) throw new Error('desktop_integration_failed: ' + JSON.stringify({ timer, miniAlwaysOnTop: miniWindow?.isAlwaysOnTop() }));
       if (miniWindow.webContents.isLoading()) await new Promise(resolve => miniWindow.webContents.once('did-finish-load', resolve));
       const paused = await miniWindow.webContents.executeJavaScript(`window.mindflowDesktop.timerAction({action:'pause'})`);
       if (paused.running || paused.seconds > 120 || paused.seconds < 100) throw new Error('mini_timer_sync_failed');

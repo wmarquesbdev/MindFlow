@@ -163,6 +163,7 @@ p { color: var(--muted); line-height: 1.52; }
 @media (max-width: 760px) { .history-metrics-grid, .history-layout { grid-template-columns: 1fr; }.history-week-preview { gap: 5px; }.week-day { min-height: 88px; padding: 8px 5px; }.week-day strong { font-size: 13px; }.history-detail-card, .history-list-card, .today-history-card { padding: 21px; }.history-detail-section dl { grid-template-columns: 1fr; } }
 
 /* MindFlow — uma interface mais calma, legível e personalizável. */
+/* Core tokens and legacy component foundations. UX 2.9 refinements at the end. */
 :root {
   --paper: #f5f4ef;
   --card: #fcfbf8;
@@ -788,3 +789,221 @@ html[data-content-width="wide"] .main-content { max-width: none; }
   .news-copy { min-height: 0; padding: 18px; }
   .library-toolbar { align-items: stretch; }.library-toolbar .library-tabs { width: 100%; }
 }
+
+/* 2.9 — clear hierarchy, reachable actions and direct manipulation. */
+html { scroll-padding-top: 90px; }
+.main-content { max-width: 1600px; padding-inline: clamp(20px, 3vw, 48px); }
+.topbar { min-height: 100px; margin-bottom: 8px; }
+.topbar h1 { font-size: clamp(25px, 2.3vw, 34px); }
+.view { padding-bottom: 24px; max-width: none; }
+.view h2 { font-size: clamp(20px, 1.6vw, 26px); line-height: 1.3; }
+.view p, .view label { line-height: 1.55; }
+.view .section-label, .eyebrow { letter-spacing: .035em; }
+.section-heading { gap: 16px; flex-wrap: wrap; }
+.page-intro { margin-bottom: 20px; }
+.page-intro p { max-width: 65ch; margin-bottom: 0; }
+.primary-button, .secondary-button, .text-button, .move-button { min-height: 36px; }
+.icon-button { min-width: 36px; min-height: 36px; }
+input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--teal); flex-shrink: 0; }
+input[type="search"] { min-height: 42px; }
+.inline-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.context-toolbar { position: sticky; top: 0; z-index: 12; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; margin: 0 0 20px; border-bottom: 1px solid var(--line); background: var(--paper); }
+.context-toolbar > strong { font-size: 14px; }
+.context-toolbar .primary-button, .context-toolbar .secondary-button { white-space: nowrap; }
+.skip-link { position: fixed; top: 8px; left: 12px; transform: translateY(-160%); z-index: 120; padding: 12px; border-radius: 8px; color: var(--paper); background: var(--ink); }
+.skip-link:focus { transform: none; }
+#main-content:focus { outline: none; }
+.toast { display: flex; align-items: center; gap: 16px; max-width: min(440px, calc(100vw - 32px)); }
+.toast button { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 6px; padding: 8px 12px; font-weight: 650; }
+.toast:not(.show) { visibility: hidden; }
+.toast.show { pointer-events: auto; visibility: visible; }
+.habit:focus-within { outline: 2px solid var(--teal); outline-offset: 3px; }
+#app-loading { position: fixed; inset: 0; z-index: 25; display: grid; place-items: center; background: var(--paper); color: var(--ink); font-size: 16px; }
+button:disabled { cursor: not-allowed; opacity: .55; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.quick-nav-button { font-size: 12px; white-space: nowrap; }
+.quick-nav { width: min(520px, calc(100vw - 32px)); padding: 24px; }
+.quick-nav-header { display: flex; align-items: end; gap: 12px; }
+.quick-nav-header label { flex: 1; }
+#quick-nav-results { display: grid; gap: 4px; margin: 18px 0; max-height: 50vh; overflow-y: auto; }
+.quick-nav-result { text-align: left; padding: 12px; border: 1px solid transparent; border-radius: 8px; color: var(--ink); background: var(--card); }
+.quick-nav-result:hover, .quick-nav-result:focus-visible { background: var(--teal-pale); }
+
+/* Home shows decisions first; information browsing comes last. */
+#inicio.active { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr); gap: 18px; align-items: start; }
+#inicio > .home-intro { grid-column: 1 / -1; margin: 0; order: 0; }
+#home-overview { grid-column: 1 / -1; order: 1; }
+.overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.overview-tile { display: grid; gap: 7px; text-align: left; padding: 18px 20px; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 12px; min-width: 0; }
+.overview-tile:hover { border-color: var(--teal); background: var(--card-soft); }
+.overview-tile > span { font-size: 13px; font-weight: 600; }
+.overview-tile > strong { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.overview-tile > small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+#inicio .hero-grid { display: block; margin: 0; order: 2; }
+#inicio .hero-copy { min-height: 220px; padding: 28px; background: var(--card-tint); }
+#inicio .hero-copy h2 { font-size: clamp(24px, 2.4vw, 36px); max-width: 30ch; overflow-wrap: anywhere; margin: 12px 0; }
+#inicio .hero-copy p { font-size: 14px; max-width: 65ch; }
+#inicio .daily-score { display: none; }
+#inicio .home-studies { order: 3; padding: 24px; margin: 0; }
+#home-study-list { grid-template-columns: 1fr; gap: 8px; }
+.home-study-item { padding: 12px 14px; gap: 4px; }
+#inicio .two-column { display: contents; }
+#inicio .priorities-card { order: 4; padding: 24px; margin: 0; }
+#inicio:has(#home-bill-reminder[hidden]) .priorities-card { grid-column: 1 / -1; }
+#inicio:has(#home-studies[hidden]) .hero-grid { grid-column: 1 / -1; }
+#inicio .home-bill-reminder { order: 5; padding: 24px; margin: 0; }
+#home-bill-list { grid-template-columns: 1fr; gap: 8px; }
+.home-bill-item { grid-template-columns: 1fr auto; gap: 5px 10px; padding: 12px; }
+.home-bill-item span { grid-column: 1 / -1; }
+#home-bill-message { font-size: 13px; }
+#inicio .week-insight { grid-column: 1 / -1; order: 6; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 24px; background: var(--card-soft); }
+.week-insight p { margin: 8px 0 0; max-width: 85ch; font-size: 13px; }
+.week-insight h2 { font-size: 18px; }
+#inicio .news-card { grid-column: 1 / -1; order: 7; padding: 24px; }
+#inicio #news-list { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+#inicio .news-item { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+#inicio .news-cover { width: 100%; min-height: 0; height: 135px; max-height: 135px; }
+#inicio .news-copy { padding: 16px; }
+#inicio .news-title { font-size: 16px; }
+#inicio .news-summary { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+#inicio .priority-item { min-height: 60px; }
+#inicio .priority-copy strong { font-size: 14px; }
+
+/* Daily work: compact context, readable rows, one optional filter. */
+.today-hero { min-height: 0; padding: 24px; margin-bottom: 12px; }
+.today-hero h2 { font-size: clamp(22px, 2vw, 30px); }
+.today-hero p { margin-bottom: 0; }
+.cycle-current-strip { padding: 12px 18px; margin-bottom: 16px; }
+#today-cycle-month { display: none; }
+.today-habits-card, .today-tasks { padding: 24px; margin: 16px 0; }
+.today-habits-card .section-heading { margin-bottom: 12px; }
+.habit-filter { justify-content: space-between; margin: 10px 0 14px; font-size: 12px; color: var(--muted); }
+.habit-filter label { display: flex; gap: 8px; align-items: center; }
+.habit { min-height: 62px; padding: 12px; }
+.habit-copy strong { font-size: 14px; font-weight: 600; }
+.habit-copy small { font-size: 12px; }
+.habit.done .habit-copy strong { color: var(--muted); }
+.daily-task-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); }
+.daily-task-row .task-title-button { flex: 1; text-align: left; font-size: 14px; }
+.daily-task-row small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin-top: 5px; }
+.today-details { margin: 12px 0; }
+.today-history-card h2 { font-size: 21px; }
+
+/* Monthly navigation and the board remain useful even when nearly empty. */
+.cycle-hero.has-cover { min-height: 290px; }
+.cycles-list-heading { align-items: end; }
+.cycles-list-heading label { font-size: 12px; min-width: 220px; }
+.new-cycle-card { display: grid; align-content: center; justify-items: center; gap: 10px; min-height: 230px; padding: 24px; border: 1px dashed var(--teal); border-radius: 14px; color: var(--ink); background: var(--card-soft); }
+.new-cycle-card > span { font-size: 30px; color: var(--teal); }
+.new-cycle-card small { color: var(--muted); }
+.tasks-toolbar { gap: 14px; align-items: end; flex-wrap: wrap; }
+.tasks-toolbar > label { min-width: 120px; flex: 1; }
+.tasks-toolbar .task-completed { min-width: 165px; flex: 0 0 auto; padding-bottom: 10px; }
+.kanban-board { grid-template-columns: repeat(4, minmax(235px, 1fr)); align-items: start; padding: 4px 3px 16px; }
+.kanban-column { min-height: 210px; }
+.drop-zone { min-height: 160px; }
+.kanban-card h4 { font-size: 14px; }
+.kanban-card p { font-size: 12px; line-height: 1.5; }
+.kanban-actions { flex-wrap: wrap; gap: 6px; }
+.move-button { padding: 6px 8px; font-size: 11px; }
+.column-add { width: 100%; min-height: 38px; padding: 8px; border: 1px dashed var(--line); border-radius: 8px; background: transparent; color: var(--teal-dark); font-size: 12px; text-align: left; }
+.column-add:hover { background: var(--teal-pale); }
+.empty-column { padding: 18px 6px; margin: 0; }
+.task-title-button { overflow-wrap: anywhere; }
+
+/* Finance maintains full totals even while filtering individual records. */
+.finance-quick-actions { position: sticky; top: 0; z-index: 12; background: var(--paper); padding: 12px 0; border-bottom: 1px solid var(--line); }
+.finance-search { display: grid; gap: 5px; margin: 14px 0; max-width: 540px; font-size: 12px; }
+.finance-search small { color: var(--muted); font-size: 11px; }
+.finance-summary-card { min-height: 140px; padding: 20px; }
+.finance-summary-card > strong { font-size: clamp(24px, 2.5vw, 34px); font-variant-numeric: tabular-nums; }
+.finance-insight { align-items: start; }
+.finance-insight p { max-width: 90ch; }
+.finance-transactions, .finance-breakdown, .finance-limit { padding: 24px; }
+.finance-row { gap: 12px; padding-block: 16px; }
+.bill-row { padding: 18px 0; gap: 14px; }
+.finance-row-main strong, .bill-row-main strong { font-size: 14px; }
+.finance-row-main small, .bill-row-main small { font-size: 12px; line-height: 1.6; }
+
+/* Direct study progress uses a native range for pointer, touch and keyboard. */
+.library-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 18px; }
+.learning-card { padding: 22px; }
+.learning-card h3 { min-height: 0; margin: 0 0 8px; font-size: 19px; }
+.learning-card-top { margin-bottom: 14px; }
+.learning-card .learning-description { font-size: 13px; }
+.learning-card footer.study-progress-control { display: grid; gap: 8px; width: 100%; padding-top: 18px; }
+.study-progress-control label { display: grid; gap: 8px; font-size: 12px; color: var(--muted); }
+.study-progress-control input[type="range"] { appearance: none; width: 100%; min-height: 32px; height: 32px; margin: 0; padding: 0; cursor: pointer; border: 0; background: transparent; accent-color: var(--teal); }
+.study-progress-control input::-webkit-slider-runnable-track { height: 8px; border-radius: 9px; background: linear-gradient(to right, var(--teal) var(--study-progress), var(--line) var(--study-progress)); }
+.study-progress-control input::-webkit-slider-thumb { appearance: none; height: 22px; width: 22px; margin-top: -7px; border: 3px solid var(--card); border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 1px var(--teal); }
+.study-progress-control input::-moz-range-track { height: 8px; border-radius: 9px; background: var(--line); }
+.study-progress-control input::-moz-range-progress { background: var(--teal); height: 8px; border-radius: 9px; }
+.study-progress-control input::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--card); background: var(--teal); }
+.study-progress-control output { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.study-progress-control small { font-size: 11px; color: var(--muted); }
+.learning-card-bottom > span { display: none; }
+.learning-card-bottom { justify-content: flex-end; }
+.learning-card-bottom .secondary-button { font-size: 12px; }
+
+/* Focus and care: keep the next action prominent, settings secondary. */
+.timer-card { padding: 32px; }
+.timer { font-size: clamp(64px, 6vw, 90px); margin-block: 16px; font-variant-numeric: tabular-nums; }
+#focus-session-progress { display: block; width: min(100%, 340px); height: 6px; margin: 0 auto 12px; border: 0; border-radius: 8px; overflow: hidden; accent-color: var(--teal); }
+#focus-session-progress::-webkit-progress-bar { background: var(--line); }
+#focus-session-progress::-webkit-progress-value { background: var(--teal); }
+.focus-custom { margin: 20px auto 0; max-width: 460px; text-align: left; border-top: 1px solid var(--line); }
+.focus-custom summary { cursor: pointer; padding: 16px 0; color: var(--muted); font-size: 13px; }
+.focus-custom .support-note { text-align: left; }
+.focus-presets button { min-height: 38px; padding: 8px 14px; }
+#focus-next-actions { justify-content: center; margin-top: 16px; }
+.focus-task label { font-size: 14px; }
+.care-main { padding: 26px; }
+.care-goals { flex-wrap: wrap; }
+.care-goals button { min-height: 40px; }
+.care-history { max-height: 540px; overflow-y: auto; }
+.care-event small { line-height: 1.6; }
+#care-patterns { padding-top: 14px; border-top: 1px solid var(--line); }
+.notes-grid { align-items: start; }
+.note-card p { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.note-card h3 { overflow-wrap: anywhere; }
+.history-detail-card { scroll-margin-top: 80px; }
+.customize-card p { max-width: 60ch; }
+@media (min-width: 1350px) { #hoje.active { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 16px; align-items: start; } #hoje .today-hero, #hoje .cycle-current-strip, #hoje .today-history-card { grid-column: 1 / -1; margin: 0; } #hoje .today-habits-card, #hoje .today-tasks, #hoje .today-details { margin: 0; } }
+@media (max-width: 1150px) { #inicio.active { grid-template-columns: minmax(0, 1fr); } #inicio #news-list { grid-template-columns: 1fr; } #inicio .news-item { display: grid; grid-template-columns: 160px 1fr; } .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .finance-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .main-content { padding-inline: 16px; }
+  .topbar { display: grid; grid-template-columns: 36px minmax(0, 1fr); min-height: 90px; padding-block: 16px; gap: 12px; }
+  .topbar-title { grid-column: 2; }
+  .topbar-actions { grid-column: 1 / -1; gap: 8px; justify-content: flex-end; }
+  .quick-nav-button { padding: 8px; }
+  .context-toolbar { padding: 10px 0; gap: 8px; }
+  .context-toolbar > strong { display: none; }
+  .context-toolbar > .inline-actions { width: 100%; justify-content: flex-end; }
+  .context-toolbar .primary-button, .context-toolbar .secondary-button { font-size: 12px; padding: 9px 12px; }
+  #inicio .hero-copy, #inicio .home-studies, #inicio .priorities-card, #inicio .news-card, #inicio .home-bill-reminder { padding: 20px; }
+  #inicio .week-insight { display: grid; gap: 8px; padding: 20px; }
+  .overview-tile { padding: 14px; }
+  .overview-tile > strong { font-size: 25px; }
+  #inicio .news-item { grid-template-columns: 100px minmax(0, 1fr); }
+  #inicio .news-cover { height: 100%; max-height: none; min-height: 140px; }
+  #inicio .news-copy { padding: 12px; }
+  #inicio .news-title { font-size: 15px; }
+  .today-habits-card, .today-tasks, .today-hero { padding: 20px; }
+  .tasks-toolbar > label { min-width: 135px; }
+  .tasks-toolbar > label:first-child { flex-basis: 100%; }
+  .kanban-board { grid-template-columns: repeat(4, minmax(255px, 82vw)); scroll-snap-type: x proximity; }
+  .kanban-column { scroll-snap-align: start; }
+  .cycles-list-heading label { width: 100%; }
+  .finance-quick-actions { gap: 8px; flex-wrap: wrap; }
+  .finance-quick-actions > button { font-size: 12px; padding: 9px 10px; }
+  .finance-period { flex-wrap: wrap; }
+  .finance-summary { grid-template-columns: 1fr; }
+  .finance-summary-card { min-height: 110px; }
+  .finance-transactions, .finance-breakdown, .finance-limit { padding: 20px; }
+  .finance-row, .bill-row { flex-wrap: wrap; }
+  .finance-row-main, .bill-row-main { flex-basis: 100%; }
+  .timer-card { padding: 24px 20px; }
+  .cycle-hero.has-cover { min-height: 340px; }
+  .care-history { max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

@@ -22,6 +22,8 @@ Abra `http://127.0.0.1:3177`. No PowerShell, use `npm.cmd` se a execução de sc
 
 ## O que tem
 
+**2.9 · Menos cliques, mais clareza:** início com resumo acionável, tarefas dentro do Hoje, ações fixas nos meses, busca em tarefas e finanças, navegação rápida (`Ctrl+K`) e progresso de estudos arrastável, com ajuste pelo teclado e opção de desfazer.
+
 Hábitos por mês com capas, tarefas em lista ou Kanban, notas, estudos com progresso, histórico em gráfico, Pomodoro com mini timer na área de trabalho e notícias atualizadas a cada 5 minutos enquanto a página está em uso. Personalize cores, leitura e página inicial. Inclui autocuidado e controle simples de conta, Pix, boletos e cartão. Comprovantes podem ser anexados; a leitura local apenas sugere valores e vencimentos — confirme sempre com o original.
 
 ## Atualizar

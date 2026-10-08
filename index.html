@@ -12,7 +12,8 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="app-shell">
+    <div id="app-loading" role="status">Abrindo seu espaço…</div>
+    <div class="app-shell" inert aria-busy="true">
       <button id="menu-backdrop" class="menu-backdrop" aria-label="Fechar menu" hidden></button>
       <aside class="sidebar" id="main-navigation" aria-label="Navegação principal">
         <button id="menu-close" class="icon-button menu-close" aria-label="Fechar navegação">×</button>
@@ -44,7 +45,7 @@
         </div>
       </aside>
 
-      <main class="main-content">
+      <main class="main-content" id="main-content" tabindex="-1">
         <header class="topbar">
           <button class="menu-toggle" id="menu-toggle" aria-label="Abrir menu" aria-controls="main-navigation" aria-expanded="false">☰</button>
           <div class="topbar-title">
@@ -60,13 +61,15 @@
         </header>
 
         <section class="view active" id="inicio" data-title="Seu espaço está pronto." data-kicker="SISTEMA PESSOAL">
-          <div class="home-profile"><img id="home-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="64" height="64" /><div><span class="section-label">Seu lugar, seu ritmo</span><p id="home-profile-name">Seu espaço pessoal</p></div><button class="text-button" id="edit-profile-home">Editar perfil</button></div>
+          <div class="home-profile" hidden><img id="home-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="64" height="64" /><div><span class="section-label">Seu lugar, seu ritmo</span><p id="home-profile-name">Seu espaço pessoal</p></div><button class="text-button" id="edit-profile-home">Editar perfil</button></div>
+          <p class="home-intro">Um olhar sobre seu dia. Escolha por onde continuar.</p>
+          <div id="home-overview" class="overview-grid" aria-label="Resumo de hoje"></div>
           <div class="hero-grid">
             <article class="hero-copy card">
-              <p class="section-label">DIREÇÃO DO DIA</p>
+              <p class="section-label">SEU PRÓXIMO PASSO</p>
               <h2 id="home-direction-title">Um dia com espaço para o que importa.</h2>
               <p id="home-direction-copy">Escolha uma tarefa, cuide dos hábitos e reserve um momento para aprender.</p>
-              <button class="primary-button" data-route="hoje">Abrir meu dia <span>→</span></button>
+              <div class="inline-actions"><button class="primary-button" id="home-start-focus">Preparar foco →</button><button class="text-button" data-route="hoje">Abrir meu dia</button></div>
               <span id="home-focus-summary" class="home-focus-summary">0 min de foco hoje</span>
             </article>
             <article class="daily-score card">
@@ -79,6 +82,7 @@
 
           <article class="card home-bill-reminder" id="home-bill-reminder" hidden><div class="section-heading"><div><span class="section-label">CONTAS PARA CONFERIR</span><p id="home-bill-message"></p></div><button type="button" class="text-button" id="home-open-bills">Ver contas →</button></div><div id="home-bill-list" class="home-bill-list"></div></article>
 
+          <article class="card week-insight"><div><span class="section-label">ÚLTIMOS 7 DIAS</span><h2>Seu ritmo, sem cobrança</h2><p id="home-week-insight"></p></div><button class="text-button" data-route="historico">Explorar histórico →</button></article>
           <div class="metrics-grid">
             <article class="metric-card card"><span class="metric-icon teal">✓</span><div><p>Hábitos</p><strong id="metric-habits">0/10</strong><small>concluídos hoje</small></div></article>
             <article class="metric-card card"><span class="metric-icon orange">▣</span><div><p>Em andamento</p><strong id="metric-doing">0</strong><small>limite sugerido: 2</small></div></article>
@@ -132,8 +136,10 @@
           <article class="card habits-card today-habits-card">
             <div class="section-heading"><div><p class="section-label">ESSENCIAL</p><h2>Hábitos de hoje</h2><p>Marque o que aconteceu. O resto pode esperar.</p></div><div class="habit-actions"><button class="text-button" id="open-habit-manager">Editar hábitos</button><button class="text-button subtle-action" id="reset-habits">Limpar dia</button></div></div>
             <div class="today-habit-progress"><span id="today-habit-progress-text">0 de 0 concluídos</span><div class="progress-track"><span id="today-habit-progress"></span></div></div>
+            <div class="inline-actions habit-filter"><label class="checkbox-label"><input type="checkbox" id="habits-pending-only"> Mostrar só os que faltam</label><span id="habits-feedback" role="status"></span></div>
             <div id="habits-list" class="habits-list"></div>
           </article>
+          <article class="card today-tasks"><div class="section-heading"><div><span class="section-label">UMA COISA POR VEZ</span><h2>Tarefas para hoje</h2></div><button class="secondary-button" id="today-add-task">+ Tarefa de hoje</button></div><div id="today-task-list"></div><button class="text-button" data-route="tarefas">Ver todas as tarefas →</button></article>
           <article class="card today-history-card">
             <div class="section-heading"><div><p class="section-label">ÚLTIMOS 7 DIAS</p><h2>Seu ritmo recente</h2><p id="history-preview-copy">Registre um pouco por dia para enxergar padrões.</p></div><button class="text-button" data-route="historico">Ver histórico →</button></div>
             <div id="history-week-preview" class="history-week-preview" aria-label="Resumo dos últimos sete dias"></div>
@@ -165,7 +171,7 @@
         <section class="view" id="ciclos" data-title="Ciclos mensais" data-kicker="CONSTRUA UM MÊS DE CADA VEZ">
           <div class="section-heading page-intro"><div><span class="section-label">Seus meses</span><h2>Cada mês pode ter uma intenção diferente.</h2><p>Crie um ciclo com identidade, metas e hábitos próprios. Seu histórico continua guardado.</p></div><button class="primary-button" id="open-cycle-form">+ Novo mês</button></div>
           <article class="card active-cycle-overview" id="active-cycle-overview"></article>
-          <div class="section-heading cycles-list-heading"><div><span class="section-label">Arquivo de ciclos</span><h2>Meses criados</h2></div></div>
+          <div class="section-heading cycles-list-heading"><div><span class="section-label">Arquivo de ciclos</span><h2>Meses criados</h2></div><label>Buscar mês<input type="search" id="cycle-search" placeholder="Nome, ano ou intenção…"></label></div>
           <div class="cycles-grid" id="cycles-grid"></div>
         </section>
 
@@ -185,6 +191,7 @@
         <section class="view" id="tarefas" data-title="Minhas tarefas" data-kicker="UMA COISA POR VEZ">
           <div class="section-heading page-intro"><div><h2>Da ideia ao feito.</h2><p>As mesmas tarefas, na visualização que funciona para você.</p></div><button class="primary-button" id="open-task-form">+ Nova tarefa</button></div>
           <div class="tasks-toolbar">
+            <label>Buscar<input type="search" id="task-search" placeholder="Título ou descrição…"></label>
             <div class="segmented-control" aria-label="Visualização de tarefas"><button type="button" data-task-view="board" aria-pressed="true">Quadro</button><button type="button" data-task-view="list" aria-pressed="false">Lista</button></div>
             <label>Área<select id="task-filter"><option value="all">Todas</option><option value="work">Trabalho</option><option value="personal">Pessoal</option></select></label>
             <label>Período<select id="task-period"><option value="all">Todas as datas</option><option value="today">Hoje e atrasadas</option><option value="undated">Sem data</option></select></label>
@@ -204,6 +211,7 @@
           <div class="section-heading page-intro"><div><h2>Seu mês, em poucas decisões.</h2><p>Registre entradas, acompanhe vencimentos e confira o que realmente saiu da conta.</p></div></div>
           <div class="finance-quick-actions" aria-label="Ações financeiras"><button type="button" class="primary-button" id="finance-add-income">+ Entrada</button><button type="button" class="secondary-button" id="finance-add-expense">+ Gasto</button><button type="button" class="secondary-button" id="finance-add-bill">+ Conta a pagar</button><button type="button" class="secondary-button" id="finance-add-invoice">+ Fatura do cartão</button><button type="button" class="text-button" id="finance-read-document">Ler documento</button></div>
           <div class="finance-insight card" id="finance-insight" aria-live="polite"></div>
+          <label class="finance-search">Buscar nos registros<input type="search" id="finance-search" placeholder="Nome de uma conta, compra ou lançamento…"><small>A busca filtra as listas da aba, não altera os totais do mês.</small></label><p id="finance-search-status" class="support-note" role="status"></p>
           <div class="finance-toolbar"><div class="segmented-control" aria-label="Área financeira"><button type="button" data-finance-view="account" aria-pressed="true">Conta e Pix</button><button type="button" data-finance-view="bills" aria-pressed="false">Contas do mês</button><button type="button" data-finance-view="card" aria-pressed="false">Cartão</button></div><div class="finance-period"><button type="button" class="icon-button" id="finance-prev-month" aria-label="Mês anterior">‹</button><h3 id="finance-month-label"></h3><button type="button" class="icon-button" id="finance-next-month" aria-label="Próximo mês">›</button><button type="button" class="text-button" id="finance-current-month">Este mês</button></div></div>
           <div id="finance-account-view">
             <div class="finance-summary" aria-live="polite"><article class="card finance-summary-card"><span>Entradas do mês</span><strong id="finance-income">R$ 0,00</strong><small>Pagamento e outras receitas</small></article><article class="card finance-summary-card"><span>Saídas da conta</span><strong id="finance-expenses">R$ 0,00</strong><small>Gastos diretos + faturas pagas</small></article><article class="card finance-summary-card finance-balance"><span>Saldo estimado hoje</span><strong id="finance-balance">—</strong><small id="finance-balance-hint">Ajuste o saldo uma vez para começar</small><button type="button" class="text-button" id="finance-set-balance">Ajustar saldo</button></article></div>
@@ -232,9 +240,11 @@
             <article class="timer-card card">
               <p class="section-label">POMODORO</p><h2 id="timer-mode">Hora de focar</h2>
               <div class="timer" id="timer-display">25:00</div>
+              <progress id="focus-session-progress" max="100" value="0" aria-label="Tempo decorrido nesta sessão"></progress><p id="focus-session-copy" class="support-note"></p>
               <div class="timer-controls"><button class="primary-button" id="timer-start">Começar</button><button class="secondary-button" id="timer-reset">Reiniciar</button></div>
               <div class="focus-presets"><button data-minutes="25" class="active">25 min</button><button data-minutes="50">50 min</button><button data-minutes="5">5 min pausa</button></div>
-              <form id="focus-duration-form" class="focus-duration-form"><label>Minutos<input id="focus-duration" type="number" min="1" max="180" required value="25"></label><label>Tipo<select id="focus-kind"><option value="focus">Foco</option><option value="break">Pausa</option></select></label><button class="secondary-button">Aplicar</button></form><p class="support-note">Aplicar ajusta a duração e começa um novo ciclo pausado.</p>
+              <details class="focus-custom"><summary>Duração personalizada</summary><form id="focus-duration-form" class="focus-duration-form"><label>Minutos<input id="focus-duration" type="number" min="1" max="180" required value="25"></label><label>Tipo<select id="focus-kind"><option value="focus">Foco</option><option value="break">Pausa</option></select></label><button class="secondary-button">Definir sessão</button></form><p class="support-note">Define uma nova sessão pausada. Use Começar quando estiver pronto.</p></details>
+              <div id="focus-next-actions" class="inline-actions" hidden><button class="secondary-button" id="focus-next-break">Preparar pausa de 5 min</button><button class="text-button" id="focus-next-work">Preparar foco de 25 min</button></div>
               <p class="focus-log">Hoje: <strong id="focus-minutes">0 min</strong> de foco registrado</p>
             </article>
             <article class="card focus-ritual"><p class="section-label">ANTES DE COMEÇAR</p><h2>Crie o ambiente</h2><label class="ritual-item"><input type="checkbox" data-ritual="tabs" /> Só abas relacionadas à tarefa</label><label class="ritual-item"><input type="checkbox" data-ritual="phone" /> Celular fora do alcance</label><label class="ritual-item"><input type="checkbox" data-ritual="water" /> Água por perto</label><label class="ritual-item"><input type="checkbox" data-ritual="defined" /> Próxima ação definida</label><div class="focus-task"><label for="focus-task-input">No que vou focar?</label><input id="focus-task-input" placeholder="Ex.: concluir a proposta" /></div><button class="secondary-button popout-button" id="popout-timer">↗ Timer na área de trabalho</button><p class="support-note">No app Windows, a mini janela fica sobre os outros aplicativos e aparece ao minimizar durante o foco. Mantenha o MindFlow aberto. No navegador, depende do suporte à mini janela.</p></article>

@@ -7,7 +7,7 @@ const APP_NAME = 'MindFlow';
 const LOCAL_SERVER_PORT = '3177';
 let DATE_KEY = new Date().toLocaleDateString('en-CA');
 let MONTH_KEY = DATE_KEY.slice(0, 7);
-const STATUS = { backlog: 'Backlog', next: 'Próxima', doing: 'Em andamento', done: 'Concluído' };
+const STATUS = { backlog: 'A fazer', next: 'Próxima', doing: 'Em andamento', done: 'Concluído' };
 const WIP_LIMIT = 2;
 const NEWS_TOPICS = {
   brazil: { label: 'Brasil', query: 'sourcecountry:brazil' },
@@ -548,7 +548,7 @@ function markShared(revision) {
     if (sharedPending) localStorage.setItem(SYNC_PENDING_KEY, '1');
     else localStorage.removeItem(SYNC_PENDING_KEY);
   } catch { /* A cópia compartilhada continua salva no arquivo local. */ }
-  setSyncStatus('Sincronizado neste PC');
+  setSyncStatus(sharedPending ? 'Salvando alterações neste PC…' : 'Sincronizado neste PC');
   refreshStorageInfo();
 }
 
@@ -624,7 +624,9 @@ async function initializeSharedState() {
   refreshStorageInfo();
   if (remote.state) {
     let choice = 'shared';
-    if (meaningfulData(state) && (!marker || pending)) choice = await askMigrationChoice();
+    const recovery = syncRecoveryDecision(state, remote.state, marker, remote.revision, pending);
+    if (recovery === 'local') choice = 'browser';
+    else if (recovery === 'ask' && meaningfulData(state)) choice = await askMigrationChoice();
     if (choice === 'browser') {
       sharedPending = true;
       localStorage.setItem(SYNC_PENDING_KEY, '1');
@@ -644,7 +646,7 @@ async function initializeSharedState() {
 }
 
 async function refreshSharedState() {
-  if (sharedSaving || document.querySelector('dialog[open]')) return;
+  if (sharedSaving || document.querySelector('dialog[open]') || document.activeElement?.matches('input, textarea, select')) return;
   if (!sharedEndpoint) {
     if (sharedConnecting) return;
     sharedConnecting = true;
@@ -794,21 +796,26 @@ function updateSummary() {
   $('#today-habit-progress').style.width = `${percentage}%`;
   $('#today-habit-progress-text').textContent = total ? `${completed} de ${total} concluídos` : 'Adicione seu primeiro hábito';
   $('#focus-minutes').textContent = `${focus} min`;
+  renderDailyOverview();
 }
 
 function renderHabits() {
   const habits = activeHabits();
   const values = todayHabits();
-  $('#habits-list').innerHTML = habits.length ? habits.map(habit => `
+  const visible = habits.filter(habit => !$('#habits-pending-only').checked || !values[habit.id]);
+  $('#habits-list').innerHTML = visible.length ? visible.map(habit => `
     <label class="habit ${values[habit.id] ? 'done' : ''}">
       <input type="checkbox" data-habit-id="${escapeHTML(habit.id)}" ${values[habit.id] ? 'checked' : ''} />
       <span class="check-symbol">✓</span>
       <span class="habit-copy"><strong>${escapeHTML(habit.title)}</strong>${habit.cue ? `<small>${escapeHTML(habit.cue)}</small>` : ''}</span>
-    </label>`).join('') : '<p class="updates-empty">Nenhum hábito ativo. Use “Editar hábitos” para criar o primeiro.</p>';
+    </label>`).join('') : `<p class="updates-empty">${habits.length ? 'Tudo marcado por hoje. Desative o filtro para rever os hábitos.' : 'Nenhum hábito ativo. Use “Editar hábitos” para criar o primeiro.'}</p>`;
   $$('[data-habit-id]').forEach(input => input.addEventListener('change', event => {
     const id = event.target.dataset.habitId;
     state.habits[DATE_KEY] = { ...todayHabits(), [id]: event.target.checked };
     save(); renderHabits(); renderCycles(); renderHistoryPreview(); renderHistory(); updateSummary();
+    const replacement = $$('[data-habit-id]').find(control => control.dataset.habitId === id);
+    (replacement || $('#habits-pending-only')).focus({ preventScroll: true });
+    $('#habits-feedback').textContent = `${completedHabitCount()} de ${habits.length} concluídos`;
   }));
 }
 
@@ -835,18 +842,18 @@ function renderJournalAndCheckin() {
   });
 }
 
-function getNextTask() { return state.tasks.find(task => task.status === 'doing') || state.tasks.find(task => task.status === 'next') || null; }
+function getNextTask() { return actionableTasks()[0] || null; }
 
 function renderPriorities() {
-  const candidates = state.tasks.filter(task => task.status === 'next' || task.status === 'doing').slice(0, 4);
+  const candidates = actionableTasks().filter(task => task.id !== getNextTask()?.id).slice(0, 3);
   $('#priority-list').innerHTML = candidates.length ? candidates.map(task => `
-    <div class="priority-item"><input class="priority-checkbox" type="checkbox" data-priority-task="${escapeHTML(task.id)}" ${task.status === 'done' ? 'checked' : ''} />
+    <div class="priority-item"><input class="priority-checkbox" type="checkbox" aria-label="Concluir ${escapeHTML(task.title)}" data-priority-task="${escapeHTML(task.id)}" ${task.status === 'done' ? 'checked' : ''} />
       <div class="priority-copy"><strong>${escapeHTML(task.title)}</strong><span>${task.status === 'doing' ? 'em andamento' : 'próxima ação'} · ${task.area === 'work' ? 'trabalho' : 'pessoal'}</span></div>
-      <span class="badge ${task.priority}">${priorityLabel(task.priority)}</span></div>`).join('') : '<p class="updates-empty">Nada definido ainda. Capture uma tarefa e escolha a próxima ação.</p>';
+      <span class="badge ${task.priority}">${priorityLabel(task.priority)}</span></div>`).join('') : '<p class="updates-empty">Nenhuma outra prioridade. Deixe espaço para o que já escolheu.</p>';
   $$('[data-priority-task]').forEach(input => input.onchange = () => updateTask(input.dataset.priorityTask, { status: input.checked ? 'done' : 'next' }));
   const nextTask = getNextTask();
   $('#home-direction-title').textContent = nextTask ? nextTask.title : 'Um dia com espaço para o que importa.';
-  $('#home-direction-copy').textContent = nextTask ? 'Sua próxima ação está aqui. Abra o dia e avance no seu ritmo.' : 'Escolha uma tarefa, cuide dos hábitos e reserve um momento para aprender.';
+  $('#home-direction-copy').textContent = nextTask ? `${STATUS[nextTask.status]}${nextTask.date ? ' · ' + (nextTask.date < DATE_KEY ? 'Prazo passou: ' : 'Prazo: ') + formatTaskDate(nextTask.date) : ''}. Reserve um bloco de atenção para avançar.` : 'Escolha uma tarefa, cuide dos hábitos e reserve um momento para aprender.';
   $('#home-focus-summary').textContent = `${state.focusMinutes[DATE_KEY] || 0} min de foco hoje`;
   $('#today-next-title').textContent = nextTask ? nextTask.title : 'Escolha a próxima ação.';
   $('#today-next-note').textContent = nextTask ? (nextTask.note || 'Defina um começo simples e inicie um bloco de foco.') : 'Capture uma tarefa, mova para “Próxima” e dê atenção a uma coisa por vez.';
@@ -868,8 +875,9 @@ function formatTaskDate(date) {
 function filteredTasks() {
   const area = $('#task-filter').value, period = $('#task-period').value;
   return state.tasks.filter(task => (area === 'all' || task.area === area)
+    && matchesSearch(`${task.title} ${task.note}`, $('#task-search').value)
     && ($('#task-show-done').checked || task.status !== 'done')
-    && (period === 'all' || (period === 'undated' ? !task.date : task.date && task.date <= DATE_KEY)));
+    && (period === 'all' || (period === 'actionable' ? actionableTasks([task]).length > 0 : period === 'undated' ? !task.date : task.date && task.date <= DATE_KEY)));
 }
 function renderTaskView() {
   const board = state.settings.taskView === 'board';
@@ -914,7 +922,14 @@ function moveTask(id, status) {
   if (status === 'doing' && state.tasks.filter(item => item.status === 'doing').length >= WIP_LIMIT) {
     showToast(`O limite de ${WIP_LIMIT} itens em andamento foi atingido. Finalize ou mova um cartão antes.`); return;
   }
+  const previous = task.status;
   task.status = status; save(); renderAll();
+  if (status === 'done') showUndo('Tarefa concluída.', () => {
+    const current = state.tasks.find(item => item.id === id);
+    if (!current || current.status !== 'done') return;
+    current.status = previous === 'doing' && state.tasks.filter(item => item.status === 'doing').length >= WIP_LIMIT ? 'next' : previous;
+    save(); renderAll();
+  });
 }
 
 function updateTask(id, updates) {
@@ -934,7 +949,8 @@ function renderKanban() {
       const index = flow.indexOf(status); const left = index > 0 ? flow[index - 1] : null; const right = index < flow.length - 1 ? flow[index + 1] : null;
       if (status === 'done') return `<article class="kanban-card completed-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="completed-mark">✓ Concluída</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4><button class="text-button" data-move="${escapeHTML(task.id)}" data-to="next">Reabrir</button></article>`;
       return `<article class="kanban-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="badge ${task.area}">${task.area === 'work' ? 'Trabalho' : 'Pessoal'}</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4>${task.note ? `<p>${escapeHTML(task.note)}</p>` : ''}<div class="kanban-meta"><span class="badge ${task.priority}">${priorityLabel(task.priority)}</span><span class="task-date">${formatTaskDate(task.date)}</span></div><div class="kanban-actions">${left ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${left}">← ${STATUS[left]}</button>` : ''}${right ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${right}">${STATUS[right]} →</button>` : ''}</div></article>`;
-    }).join('') : '<p class="empty-column">Solte um cartão aqui</p>';
+    }).join('') : '<p class="empty-column">Nenhuma tarefa aqui</p>';
+    if (status !== 'done') zone.insertAdjacentHTML('beforeend', `<button class="column-add" data-add-in-column="${status}">+ Adicionar tarefa</button>`);
   });
   bindTaskEditors();
   $$('.kanban-card').forEach(card => card.addEventListener('dragstart', event => { event.dataTransfer.setData('text/plain', card.dataset.taskId); event.dataTransfer.effectAllowed = 'move'; }));
@@ -944,6 +960,7 @@ function renderKanban() {
     zone.ondrop = event => { event.preventDefault(); zone.classList.remove('drag-over'); moveTask(event.dataTransfer.getData('text/plain'), zone.dataset.status); };
   });
   $$('[data-move]').forEach(button => button.onclick = () => moveTask(button.dataset.move, button.dataset.to));
+  $$('[data-add-in-column]').forEach(button => button.onclick = () => { openTaskEditor(); $('#task-status-input').value = button.dataset.addInColumn; });
 }
 
 function renderLearning() {
@@ -968,6 +985,7 @@ function renderLearning() {
     openDialog('learning-progress-dialog'); $('#progress-current').focus();
   });
   $$('[data-edit-learning]').forEach(button => button.onclick = () => openLearningEditor(state.learning.find(item => item.id === button.dataset.editLearning)));
+  bindStudySliders();
   renderHomeStudies();
 }
 function learningUnit(item) { return ({ pages: 'páginas', lessons: 'aulas', hours: 'horas' })[item.unit] || (item.type === 'course' ? 'horas' : 'páginas'); }
@@ -987,7 +1005,13 @@ function openLearningEditor(item) {
 function renderHomeStudies() {
   const items = state.learning.filter(item => !item.total || item.current < item.total).slice(0, 2);
   $('#home-study-list').innerHTML = items.length ? items.map(item => `<button class="home-study-item" data-open-study="${escapeHTML(item.id)}"><span>${item.type === 'course' ? 'Curso' : 'Leitura'}</span><strong>${escapeHTML(item.title)}</strong><small>${progress(item.current, item.total)}% · continuar →</small></button>`).join('') : '<p class="updates-empty">Separe um livro ou curso para continuar no seu ritmo.</p>';
-  $$('[data-open-study]').forEach(button => button.onclick = () => { setRoute('biblioteca'); openLearningEditor(state.learning.find(item => item.id === button.dataset.openStudy)); });
+  $$('[data-open-study]').forEach(button => button.onclick = () => {
+    activeLibrary = 'all'; activeLearningCategory = 'all'; learningSearch = ''; learningStatus = 'all';
+    $('#learning-search').value = ''; $('#learning-status-filter').value = 'all';
+    renderLearning(); setRoute('biblioteca');
+    const control = $$('[data-learning-progress]').find(item => item.dataset.learningProgress === button.dataset.openStudy);
+    control?.click();
+  });
 }
 
 function renderVision() {
@@ -1010,6 +1034,7 @@ function cycleStats(cycle) {
 }
 
 function renderCycles() {
+  const calendarOpen = $('#active-cycle-overview .cycle-days')?.open;
   const selected = activeCycle();
   if (!selected) return;
   const monthName = monthLabel(selected.month);
@@ -1029,6 +1054,7 @@ function renderCycles() {
   overview.append(hero);
   const calendar = document.createElement('details');
   calendar.className = 'cycle-days';
+  calendar.open = Boolean(calendarOpen);
   const numberOfDays = new Date(Number(selected.month.slice(0, 4)), Number(selected.month.slice(5)), 0).getDate();
   const firstWeekday = new Date(selected.month + '-01T12:00:00').getDay();
   calendar.innerHTML = '<summary>Ver registros do mês</summary><p class="support-note">Selecione um dia para consultar hábitos, foco e diário.</p><div class="cycle-days-grid">'
@@ -1055,6 +1081,12 @@ function renderCycles() {
   $$('[data-open-cycle]').forEach(button => button.onclick = () => { state.activeCycleId = button.dataset.openCycle; save(); renderAll(); $('#active-cycle-overview').scrollIntoView({ behavior: 'smooth' }); });
   $$('[data-edit-cycle]').forEach(button => button.onclick = () => openCycleEditor(state.cycles.find(cycle => cycle.id === button.dataset.editCycle)));
   $$('[data-manage-cycle-habits]').forEach(button => button.onclick = () => { state.activeCycleId = button.dataset.manageCycleHabits; save(); renderHabitManager(); openDialog('habit-dialog'); });
+  const create = document.createElement('button');
+  create.className = 'new-cycle-card'; create.type = 'button';
+  create.innerHTML = '<span aria-hidden="true">+</span><strong>Criar outro mês</strong><small>Personalize uma nova etapa</small>';
+  create.onclick = () => { openCycleEditor(); $('#cycle-month-input').value = shiftMonth(selected.month, 1); };
+  $('#cycles-grid').append(create);
+  filterCycleCards();
 }
 
 function openCycleEditor(cycle = null) {
@@ -1183,12 +1215,21 @@ function updatePipTimer() {
 function updateTimerDisplay() {
   const formatted = formatTimer();
   $('#timer-display').textContent = formatted;
-  $('#timer-start').textContent = timerRunning ? 'Pausar' : 'Começar';
+  $('#timer-start').textContent = timerRunning ? 'Pausar' : !timerSeconds ? 'Repetir sessão' : timerSeconds < timerPreset * 60 ? 'Retomar' : 'Começar';
   $('#timer-mode').textContent = !timerSeconds ? 'Ciclo concluído' : timerMode === 'break' ? 'Pausa consciente' : timerRunning ? 'Foco em andamento' : 'Hora de focar';
   $('#floating-timer-display').textContent = formatted;
   $('#floating-timer-toggle').textContent = timerRunning ? 'Pausar' : 'Retomar';
   $('#floating-timer-label').textContent = !timerSeconds ? 'CICLO CONCLUÍDO' : timerMode === 'break' ? 'PAUSA' : timerRunning ? 'FOCO EM ANDAMENTO' : 'FOCO PAUSADO';
   document.title = timerRunning ? `${formatted} · MindFlow` : 'MindFlow';
+  $('#focus-session-progress').value = progress(timerPreset * 60 - timerSeconds, timerPreset * 60);
+  $('#focus-session-copy').textContent = `${timerPreset} min de ${timerMode === 'break' ? 'pausa' : 'foco'} · ${timerRunning ? 'em andamento' : !timerSeconds ? 'concluídos' : timerSeconds < timerPreset * 60 ? 'sessão pausada' : 'pronto para começar'}`;
+  $('#focus-next-actions').hidden = Boolean(timerSeconds);
+  $$('.focus-presets button').forEach(button => {
+    const selected = Number(button.dataset.minutes) === timerPreset && (button.dataset.minutes === '5' ? 'break' : 'focus') === timerMode;
+    button.classList.toggle('active', selected); button.setAttribute('aria-pressed', String(selected));
+    button.disabled = timerRunning;
+  });
+  $('#focus-duration-form button').disabled = timerRunning;
   updatePipTimer();
 }
 
@@ -1256,18 +1297,14 @@ function bindFocus() {
   $('#timer-start').onclick = () => setTimerRunning(!timerRunning);
   $('#timer-reset').onclick = () => dispatchFocus({ action: 'reset' });
   $$('.focus-presets button').forEach(button => button.onclick = () => {
-    $('#focus-duration').value = button.dataset.minutes;
-    $('#focus-kind').value = button.dataset.minutes === '5' ? 'break' : 'focus';
-    dispatchFocus({ action: 'configure', minutes: Number(button.dataset.minutes), mode: $('#focus-kind').value });
-    $$('.focus-presets button').forEach(item => item.classList.toggle('active', item === button));
+    prepareFocusSession(Number(button.dataset.minutes), button.dataset.minutes === '5' ? 'break' : 'focus');
   });
   $('#focus-duration').value = timerPreset;
   $('#focus-kind').value = timerMode;
   $('#focus-duration-form').onsubmit = event => {
     event.preventDefault(); const minutes = Number($('#focus-duration').value);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 180) return;
-    state.settings.focusDuration = minutes; save();
-    dispatchFocus({ action: 'configure', minutes, mode: $('#focus-kind').value });
+    prepareFocusSession(minutes, $('#focus-kind').value);
   };
   $$('.ritual-item input').forEach(input => {
     input.checked = Boolean(state.rituals[input.dataset.ritual]);
@@ -1492,7 +1529,7 @@ function renderFinance() {
   }
   $('#finance-insight').innerHTML = `<div><span class="section-label">LEITURA DO MÊS</span><strong>${pendingTotal ? `${formatMoney(pendingTotal)} ainda previsto para pagar` : 'Sem pendências cadastradas neste mês'}</strong><p>${escapeHTML(insights.slice(0, 3).join(' '))}</p></div><button type="button" class="text-button" id="finance-insight-open-bills">Ver contas →</button>`;
   $('#finance-insight-open-bills').onclick = () => { financeView = 'bills'; renderFinance(); };
-  const accountRows = [...entries, ...monthPayments.map(payment => ({ id: `payment-${payment.month}`, date: payment.date, title: `Fatura ${monthLabel(payment.month)}`, type: 'expense', category: 'bills', amountCents: payment.amountCents, payment: true }))];
+  const accountRows = [...entries, ...monthPayments.map(payment => ({ id: `payment-${payment.month}-${payment.date}`, month: payment.month, date: payment.date, title: `Fatura ${monthLabel(payment.month)}`, type: 'expense', category: 'bills', amountCents: payment.amountCents, payment: true }))];
   const filtered = accountRows.filter(item => financeFilter === 'all' || item.type === financeFilter).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
   $('#finance-list').innerHTML = filtered.length ? filtered.map(item => `<div class="finance-row"><div class="finance-row-main"><strong>${escapeHTML(item.title)}</strong><small>${item.payment ? 'Pagamento do cartão' : `${escapeHTML(FINANCE_CATEGORIES[item.type][item.category])} · ${item.method === 'pix' ? 'Pix' : 'Conta'}`} · ${escapeHTML(formatHistoryDate(item.date, { day: '2-digit', month: 'short' }))}</small>${item.documentId ? documentLink(item.documentId) : ''}</div><strong class="finance-amount ${item.type}">${item.type === 'expense' ? '−' : '+'} ${formatMoney(item.amountCents)}</strong>${item.payment ? `<button type="button" class="text-button" data-document-invoice="${escapeHTML(item.month)}">Comprovante</button>` : `<button type="button" class="text-button" data-document-transaction="${escapeHTML(item.id)}">${item.documentId ? 'Trocar arquivo' : 'Anexar'}</button><button type="button" class="text-button" data-finance-edit="${escapeHTML(item.id)}" aria-label="Editar ${escapeHTML(item.title)}">Editar</button>`}</div>`).join('') : `<div class="finance-empty"><h3>${accountRows.length ? 'Nada neste filtro' : 'Comece pela sua conta'}</h3><p>${accountRows.length ? 'Escolha outro tipo para ver os lançamentos.' : 'Ajuste o saldo atual e registre as novas entradas ou saídas. Pix é uma movimentação da conta.'}</p>${accountRows.length ? '' : '<button type="button" class="secondary-button" id="finance-empty-add">+ Registrar lançamento</button>'}</div>`;
   const categories = Object.entries(FINANCE_CATEGORIES.expense).map(([key, label]) => ({ key, label, amount: entries.filter(item => item.type === 'expense' && item.category === key).reduce((sum, item) => sum + item.amountCents, 0) })).filter(item => item.amount).sort((a, b) => b.amount - a.amount);
@@ -1525,10 +1562,11 @@ function renderFinance() {
   $('#card-purchase-list').innerHTML = card.purchases.length ? [...card.purchases].sort((a, b) => b.date.localeCompare(a.date)).map(item => `<div class="finance-row"><div class="finance-row-main"><strong>${escapeHTML(item.title)}</strong><small>${escapeHTML(formatHistoryDate(item.date, { day: '2-digit', month: 'short' }))} · ${item.installments}x · 1ª fatura: ${escapeHTML(monthLabel(item.firstInvoiceMonth))}</small></div><strong class="finance-amount expense">${formatMoney(item.amountCents)}</strong><button type="button" class="text-button" data-card-edit="${escapeHTML(item.id)}" aria-label="Editar compra ${escapeHTML(item.title)}">Editar</button></div>`).join('') : '<p class="finance-category-empty">Ainda não há compras registradas.</p>';
   renderBills();
   renderHomeBillReminder();
+  filterFinanceRows();
 }
 function renderBills() {
   const finance = state.finance;
-  const bills = billsForMonth(finance, financeMonth);
+  const bills = billsForMonth(finance, financeMonth).sort((a, b) => Number(Boolean(a.payment || a.skipped)) - Number(Boolean(b.payment || b.skipped)) || a.dueDate.localeCompare(b.dueDate));
   const invoice = invoiceForMonth(finance.card, financeMonth);
   const invoiceTotal = invoiceTotalCents(finance.card, financeMonth);
   const cardPaid = finance.card.paidInvoices[financeMonth];
@@ -1553,6 +1591,7 @@ function renderBills() {
     rows.push(`<div class="bill-row"><div class="bill-row-main"><strong>Fatura ${escapeHTML(finance.card.name)}</strong><small>${cardPaid ? `${cardPaid.amountCents >= invoiceTotal ? 'Paga' : 'Parcial'} em ${escapeHTML(formatHistoryDate(cardPaid.date, { day: 'numeric', month: 'short' }))}` : dueDate < DATE_KEY ? 'Atrasada' : `Vence ${escapeHTML(formatHistoryDate(dueDate, { day: 'numeric', month: 'short' }))}`} · ${finance.card.statements[financeMonth] ? 'total informado' : 'pelas compras'}</small>${cardPaid?.documentId ? documentLink(cardPaid.documentId) : ''}</div><strong class="finance-amount">${formatMoney(cardPaid ? invoicePending : invoiceTotal)}</strong><div class="bill-row-actions"><button type="button" class="secondary-button" data-bill-card="1">Ver fatura</button></div></div>`);
   }
   $('#bill-list').innerHTML = rows.length ? rows.join('') : '<div class="finance-empty"><h3>Nada a pagar por aqui</h3><p>Cadastre uma conta mensal com valor previsto e vencimento. Ela só vira gasto quando você confirmar o pagamento.</p><button type="button" class="secondary-button" id="bill-empty-add">+ Cadastrar conta</button></div>';
+  $$('#bill-list .bill-row').forEach((row, index) => { row.dataset.billState = index < bills.length ? bills[index].payment ? 'paid' : bills[index].skipped ? 'skipped' : 'pending' : invoicePending ? 'pending' : 'paid'; });
 }
 function renderHomeBillReminder() {
   const bills = [MONTH_KEY, shiftMonth(MONTH_KEY, 1)].flatMap(month => {
@@ -1591,6 +1630,7 @@ function renderCare() {
   $('#care-episodes').textContent = events.filter(item => item.type === 'episode' && week.has(item.date)).length;
   const lastEpisode = events.find(item => item.type === 'episode');
   $('#care-last-episode').textContent = lastEpisode ? `Última ocorrência: ${formatHistoryDate(lastEpisode.date)}. Você pode retomar agora.` : 'Nenhuma ocorrência registrada. Observe seus padrões no seu ritmo.';
+  renderCarePatterns(events.filter(item => week.has(item.date)));
   $('#care-event-list').innerHTML = events.length ? events.map(item => `<div class="care-event"><div><strong>${item.type === 'urge' ? 'Impulso atravessado' : 'Ocorrência'}</strong><small>${escapeHTML(formatHistoryDate(item.date))}${item.trigger ? ` · ${escapeHTML(item.trigger)}` : ''}</small>${item.note ? `<p>${escapeHTML(item.note)}</p>` : ''}</div><button type="button" class="text-button" data-care-event="${escapeHTML(item.id)}" aria-label="Editar registro de ${escapeHTML(formatHistoryDate(item.date))}">Editar</button></div>`).join('') : '<p class="finance-category-empty">Se quiser, registre um impulso ou uma ocorrência para descobrir padrões.</p>';
 }
 function updateCarePauseTimer() {
@@ -2184,6 +2224,7 @@ function bindDialogs() {
     const task = normalizeTask({ id: id || makeId(), title, area: $('#task-area-input').value, priority: $('#task-priority-input').value, status, date: $('#task-date-input').value, note: $('#task-note-input').value.trim() });
     if (existing) Object.assign(existing, task); else state.tasks.unshift(task);
     if (!save()) return;
+    if (!existing) { $('#task-search').value = ''; $('#task-filter').value = 'all'; $('#task-period').value = 'all'; $('#task-show-done').checked = true; }
     taskDialog.close(); renderAll(); showToast(existing ? 'Tarefa atualizada.' : 'Tarefa criada.');
   };
   $('#delete-task').onclick = () => {
@@ -2235,7 +2276,7 @@ function bindDialogs() {
   $('#capture-form').onsubmit = event => {
     event.preventDefault();
     state.tasks.unshift({ id: makeId(), title: $('#capture-input').value.trim(), area: 'personal', priority: 'low', status: 'backlog', date: '', note: '' });
-    save(); captureDialog.close(); renderAll(); showToast('Capturado no Backlog.');
+    save(); captureDialog.close(); renderAll(); showToast('Capturado em A fazer.');
   };
   $('#open-habit-manager').onclick = () => {
     const cycle = cycleForDay(DATE_KEY);
@@ -2290,6 +2331,7 @@ function bindDialogs() {
     }
     state.activeCycleId = cycle.id;
     if (!save()) return;
+    $('#cycle-search').value = '';
     cycleDialog.close(); renderAll(); showToast(existing ? 'Ciclo atualizado.' : 'Novo ciclo criado. Agora escolha os hábitos do mês.');
   };
   $('#open-note-form').onclick = () => openNoteEditor();
@@ -2399,6 +2441,7 @@ function bindApp() {
   $('#theme-toggle').onclick = () => { state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); };
   $('#reset-habits').onclick = () => {
     if (!completedHabitCount()) return;
+    if (!confirm('Limpar todas as marcações de hoje? Os dias anteriores serão mantidos.')) return;
     const values = { ...todayHabits() }; activeHabits().forEach(habit => { values[habit.id] = false; });
     state.habits[DATE_KEY] = values; save(); renderHabits(); renderHistoryPreview(); renderHistory(); updateSummary(); showToast('Hábitos de hoje foram limpos.');
   };
@@ -2433,7 +2476,7 @@ function bindApp() {
   $('#toggle-home-studies').onchange = event => updatePreference('showHomeStudies', event.target.checked);
   $$('[data-preference]').forEach(select => select.onchange = event => updatePreference(select.dataset.preference, event.target.value));
   $('#next-quote').onclick = () => { state.settings.quoteOffset = Number(state.settings.quoteOffset || 0) + 1; save(); renderQuote(); };
-  bindDialogs(); bindFinance(); bindCare(); bindStorage(); bindSyncConflict(); bindDesktopUpdates();
+  bindDialogs(); bindFinance(); bindCare(); bindStorage(); bindSyncConflict(); bindDesktopUpdates(); bindUX();
   const routeFromHash = () => {
     const route = window.location.hash.slice(1);
     if (/^[a-z]+$/.test(route)) setRoute(route);
@@ -2464,11 +2507,12 @@ function bindDesktopUpdates() {
 
 initializeSharedState().catch(() => setSyncStatus('Dados salvos neste navegador')).finally(() => {
   renderAll(); bindApp(); loadNews({ force: false });
+  $('.app-shell').inert = false; $('.app-shell').setAttribute('aria-busy', 'false'); $('#app-loading').hidden = true;
 });
 // Keep a tab left open overnight on the correct day without losing unsaved form input.
 function refreshCalendarDay() {
   const day = new Date().toLocaleDateString('en-CA');
-  if (day === DATE_KEY || document.querySelector('dialog[open]')) return;
+  if (day === DATE_KEY || document.querySelector('dialog[open]') || document.activeElement?.matches('input, textarea, select')) return;
   const wasCurrentFinanceMonth = financeMonth === MONTH_KEY;
   DATE_KEY = day; MONTH_KEY = day.slice(0, 7); selectedHistoryDate = day;
   if (wasCurrentFinanceMonth) financeMonth = MONTH_KEY;
@@ -2482,6 +2526,196 @@ function refreshVisibleNews(force = false) {
   if (document.hidden) return;
   const route = $('.view.active')?.id;
   if (!newsRequest && (route === 'noticias' || route === 'inicio' && state.settings.showNews !== false)) loadNews({ force });
+}
+
+// UX helpers: derived views only. Existing records and storage keys stay unchanged.
+function matchesSearch(text, query = '') {
+  const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  return normalize(text).includes(normalize(query).trim());
+}
+function syncRecoveryDecision(local, remote, marker, revision, pending) {
+  const stable = value => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().filter(key => key !== 'newsCache').map(key => [key, stable(value[key])]));
+    return value;
+  };
+  if (JSON.stringify(stable(local)) === JSON.stringify(stable(remote))) return 'shared';
+  if (pending && marker && marker === revision) return 'local';
+  return !marker || pending ? 'ask' : 'shared';
+}
+function actionableTasks(tasks = state.tasks, day = DATE_KEY) {
+  const rank = task => task.status === 'doing' ? 0 : task.date && task.date < day ? 1 : task.status === 'next' ? 2 : 3;
+  return tasks.filter(task => task.status !== 'done' && (task.status === 'doing' || task.status === 'next' || task.date && task.date <= day))
+    .sort((a, b) => rank(a) - rank(b) || (a.date || '9999').localeCompare(b.date || '9999') || Number(b.priority === 'high') - Number(a.priority === 'high'));
+}
+function weekOverview(summaries) {
+  const recorded = summaries.filter(day => day.hasData);
+  const possible = recorded.reduce((sum, day) => sum + day.total, 0);
+  return { days: recorded.length, focus: summaries.reduce((sum, day) => sum + day.focus, 0), percentage: possible ? Math.round(recorded.reduce((sum, day) => sum + day.completed, 0) / possible * 100) : null };
+}
+function renderDailyOverview() {
+  const target = $('#home-overview'); if (!target) return;
+  const pending = actionableTasks();
+  const overdue = pending.filter(task => task.date && task.date < DATE_KEY).length;
+  const cards = [
+    ['tarefas', 'Tarefas para agora', pending.length, overdue ? `${overdue} com prazo passado` : 'Hoje, próximas e em andamento'],
+    ['hoje', 'Hábitos de hoje', `${completedHabitCount()}/${activeHabits().length}`, 'Seu progresso, no seu ritmo'],
+    ['foco', 'Foco de hoje', `${state.focusMinutes[DATE_KEY] || 0} min`, 'Sessões concluídas'],
+    ['biblioteca', 'Estudos em aberto', state.learning.filter(item => !item.total || item.current < item.total).length, 'Retome de onde parou']
+  ];
+  target.innerHTML = cards.map(([route, label, value, hint]) => `<button class="overview-tile" data-overview-route="${route}"><span>${label}</span><strong>${value}</strong><small>${hint} →</small></button>`).join('');
+  $$('[data-overview-route]').forEach(button => button.onclick = () => {
+    if (button.dataset.overviewRoute === 'tarefas') { $('#task-period').value = 'actionable'; $('#task-search').value = ''; $('#task-filter').value = 'all'; $('#task-show-done').checked = false; renderPlanner(); renderKanban(); }
+    setRoute(button.dataset.overviewRoute);
+  });
+  const week = weekOverview(recentDateKeys(7).map(daySummary));
+  $('#home-week-insight').textContent = week.days ? `${week.days} de 7 dias com registros · ${week.focus} min de foco.${week.percentage === null ? '' : ` ${week.percentage}% dos hábitos nos dias registrados.`} Dias sem registro não contam como falha.` : 'Seus registros vão formar este resumo. Comece por um hábito ou uma sessão de foco; não é preciso preencher tudo.';
+  renderTodayTasks();
+}
+function renderTodayTasks() {
+  const list = $('#today-task-list'); if (!list) return;
+  const tasks = actionableTasks();
+  list.innerHTML = tasks.length ? tasks.slice(0, 5).map(task => `<div class="daily-task-row"><input type="checkbox" aria-label="Concluir ${escapeHTML(task.title)}" data-today-done="${escapeHTML(task.id)}"><button class="task-title-button" data-today-edit="${escapeHTML(task.id)}">${escapeHTML(task.title)}<small>${STATUS[task.status]} · ${task.date ? (task.date < DATE_KEY ? 'Prazo passou: ' : '') + formatTaskDate(task.date) : 'Sem data'}</small></button></div>`).join('') + (tasks.length > 5 ? `<p class="support-note">Mais ${tasks.length - 5} tarefas na página Tarefas.</p>` : '') : '<p class="updates-empty">Nenhuma tarefa prevista. Adicione uma pequena próxima ação.</p>';
+  $$('[data-today-done]').forEach(input => input.onchange = () => moveTask(input.dataset.todayDone, 'done'));
+  $$('[data-today-edit]').forEach(button => button.onclick = () => openTaskEditor(state.tasks.find(task => task.id === button.dataset.todayEdit)));
+}
+function showUndo(message, undo) {
+  showToast(message); clearTimeout(showToast.timeout);
+  const button = document.createElement('button'); button.type = 'button'; button.textContent = 'Desfazer';
+  button.onclick = () => { undo(); showToast('Alteração desfeita.'); };
+  $('#toast').append(button);
+  showToast.timeout = setTimeout(() => $('#toast').classList.remove('show'), 12000);
+}
+function studyProgressValue(item, value) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || !item.total) return null;
+  const step = item.unit === 'hours' ? 10 : 1;
+  return Math.min(item.total, Math.max(0, Math.round(number * step) / step));
+}
+function bindStudySliders() {
+  $$('[data-learning-progress]').forEach(button => {
+    const item = state.learning.find(entry => entry.id === button.dataset.learningProgress);
+    if (!item?.total) return;
+    const card = button.closest('.learning-card'), footer = $('footer', card);
+    footer.className = 'study-progress-control';
+    footer.innerHTML = `<label>Até onde você chegou?<input type="range" min="0" max="${item.total}" step="${item.unit === 'hours' ? '0.1' : '1'}" value="${item.current}" aria-label="Progresso de ${escapeHTML(item.title)}"></label><output></output><small>Arraste ou use as setas do teclado. Solte para salvar.</small>`;
+    const range = $('input', footer), output = $('output', footer);
+    const preview = () => {
+      const value = studyProgressValue(item, range.value);
+      output.textContent = `${value} / ${item.total} ${learningUnit(item)} · ${progress(value, item.total)}%`;
+      range.setAttribute('aria-valuetext', output.textContent);
+      range.style.setProperty('--study-progress', `${progress(value, item.total)}%`);
+    };
+    preview(); range.oninput = preview;
+    range.onchange = () => {
+      const previous = item.current, next = studyProgressValue(item, range.value);
+      if (next === null || next === previous) return;
+      item.current = next; item.updatedAt = new Date().toISOString();
+      if (!save()) { item.current = previous; range.value = previous; preview(); return; }
+      card.classList.toggle('is-complete', next === item.total);
+      $('.learning-card-bottom > span', card).textContent = `${next}/${item.total} ${learningUnit(item)}`;
+      button.textContent = next === item.total ? '✓ Concluído · ajustar' : 'Ajustar valor exato';
+      $('#learning-summary').textContent = `${state.learning.length} itens · ${state.learning.filter(entry => entry.total > 0 && entry.current >= entry.total).length} concluídos`;
+      renderHomeStudies(); updateSummary();
+      showUndo(next === item.total ? 'Estudo concluído.' : 'Progresso salvo.', () => {
+        const current = state.learning.find(entry => entry.id === item.id);
+        if (!current || current.current !== next) return;
+        current.current = Math.min(previous, current.total); current.updatedAt = new Date().toISOString(); save(); renderLearning(); updateSummary();
+      });
+    };
+    button.textContent = item.current === item.total ? '✓ Concluído · ajustar' : 'Ajustar valor exato';
+  });
+}
+function filterCycleCards() {
+  const query = $('#cycle-search')?.value || '';
+  $$('#cycles-grid .cycle-card').forEach(card => { card.hidden = !matchesSearch(card.textContent, query); });
+}
+function filterFinanceRows() {
+  const query = $('#finance-search')?.value || '';
+  const status = financeView === 'bills' ? $('#bill-status-filter')?.value || 'all' : 'all';
+  const lists = financeView === 'account' ? ['#finance-list'] : financeView === 'bills' ? ['#bill-list'] : ['#card-invoice-list', '#card-purchase-list'];
+  let visible = 0, total = 0;
+  lists.forEach(selector => $$(`${selector} .finance-row, ${selector} .bill-row`).forEach(row => {
+    row.hidden = !matchesSearch(row.textContent, query) || status !== 'all' && row.dataset.billState !== status; total++; if (!row.hidden) visible++;
+  }));
+  if ($('#finance-search-status')) $('#finance-search-status').textContent = query || status !== 'all' ? `${visible} de ${total} registros encontrados nesta aba. Os totais continuam completos.` : '';
+}
+function renderCarePatterns(events) {
+  let target = $('#care-patterns');
+  if (!target) { target = document.createElement('p'); target.id = 'care-patterns'; target.className = 'support-note'; $('#care-last-episode').after(target); }
+  const counts = new Map();
+  events.forEach(event => { const trigger = event.trigger.trim(); if (trigger) counts.set(trigger, (counts.get(trigger) || 0) + 1); });
+  const top = [...counts].sort((a, b) => b[1] - a[1])[0];
+  target.textContent = top ? `Gatilho mais registrado nesta semana: ${top[0]} (${top[1]} ${top[1] === 1 ? 'registro' : 'registros'}). É uma observação dos seus relatos, não um diagnóstico.` : 'Ao registrar um gatilho, você começa a reconhecer situações que merecem atenção. Preencher é opcional.';
+}
+function bindUX() {
+  const toolbar = (route, title, ids) => {
+    const bar = document.createElement('div'); bar.className = 'context-toolbar'; bar.setAttribute('aria-label', `Ações de ${title}`);
+    const text = document.createElement('strong'); text.textContent = title; bar.append(text);
+    const actions = document.createElement('div'); actions.className = 'inline-actions';
+    ids.forEach(id => { const button = $(`#${id}`); if (button) actions.append(button); });
+    bar.append(actions); $(`#${route}`).prepend(bar); return actions;
+  };
+  const months = toolbar('ciclos', 'Meus meses', ['open-cycle-form']);
+  const edit = document.createElement('button'); edit.className = 'secondary-button'; edit.textContent = 'Editar mês aberto'; edit.onclick = () => openCycleEditor(activeCycle()); months.prepend(edit);
+  toolbar('tarefas', 'Minhas tarefas', ['open-task-form']);
+  toolbar('biblioteca', 'Meus estudos', ['open-learning-form']);
+  toolbar('notas', 'Meu caderno', ['open-note-form']);
+  toolbar('autocuidado', 'Meu cuidado', ['care-new-goal']);
+  toolbar('noticias', 'Notícias', ['refresh-news-page']);
+  $('#habits-pending-only').onchange = renderHabits;
+  $('#task-search').oninput = () => { renderPlanner(); renderKanban(); };
+  const actionable = document.createElement('option'); actionable.value = 'actionable'; actionable.textContent = 'Para agora'; $('#task-period').append(actionable);
+  $('#cycle-search').oninput = filterCycleCards;
+  $('#finance-search').oninput = filterFinanceRows;
+  const billFilter = document.createElement('select'); billFilter.id = 'bill-status-filter'; billFilter.setAttribute('aria-label', 'Filtrar situação das contas');
+  billFilter.innerHTML = '<option value="all">Todas as contas</option><option value="pending">A pagar</option><option value="paid">Pagas</option><option value="skipped">Ignoradas</option>';
+  billFilter.onchange = filterFinanceRows; $('#finance-bills-view .section-heading').append(billFilter);
+  $('#home-start-focus').onclick = () => $('#today-start-focus').click();
+  $('#today-add-task').onclick = () => { openTaskEditor(); $('#task-date-input').value = DATE_KEY; $('#task-status-input').value = 'next'; };
+  $('#focus-next-break').onclick = () => prepareFocusSession(5, 'break');
+  $('#focus-next-work').onclick = () => prepareFocusSession(25, 'focus');
+  // Retain the source of truth for duration when re-rendering after edits elsewhere.
+  $$('.focus-presets button').forEach(button => button.onclick = () => prepareFocusSession(Number(button.dataset.minutes), button.dataset.minutes === '5' ? 'break' : 'focus'));
+  ['progress-current', 'progress-total', 'learning-current-input', 'learning-total-input'].forEach(id => { $(`#${id}`).step = 'any'; });
+  $('#notes-search').setAttribute('aria-label', 'Buscar notas');
+  const skip = document.createElement('a'); skip.href = '#main-content'; skip.className = 'skip-link'; skip.textContent = 'Pular para o conteúdo';
+  skip.onclick = event => { event.preventDefault(); $('#main-content').focus(); }; document.body.prepend(skip);
+  const backlogTitle = $$('.column-head h3').find(heading => heading.textContent === 'Backlog');
+  if (backlogTitle) backlogTitle.textContent = 'A fazer';
+  $('#task-status-input option[value="backlog"]').textContent = 'A fazer';
+  $('#capture-dialog .modal-hint').textContent = 'Vai para A fazer. Você decide a prioridade depois.';
+  $('.wip').textContent = 'Até 2';
+  const pause = document.createElement('button'); pause.type = 'button'; pause.className = 'text-button'; pause.textContent = 'Encerrar pausa';
+  pause.onclick = () => { carePauseDeadline = 0; clearInterval(carePauseInterval); renderCare(); $('#care-pause').focus(); };
+  $('#care-pause-panel .care-actions').append(pause);
+  $('#care-open-notes').onclick = () => { setRoute('notas'); openNoteEditor(); };
+  setupQuickNavigation();
+}
+function prepareFocusSession(minutes, mode) {
+  if (timerRunning) { showToast('Pause a sessão antes de mudar sua duração.'); return; }
+  if (timerSeconds > 0 && timerSeconds < timerPreset * 60 && !confirm('Substituir a sessão pausada? O tempo parcial não será registrado.')) return;
+  $('#focus-duration').value = minutes; $('#focus-kind').value = mode;
+  if (mode === 'focus') { state.settings.focusDuration = minutes; save(); }
+  dispatchFocus({ action: 'configure', minutes, mode });
+}
+function setupQuickNavigation() {
+  const button = document.createElement('button'); button.className = 'secondary-button quick-nav-button'; button.id = 'open-quick-nav'; button.textContent = 'Ir para…'; button.title = 'Navegar pelo MindFlow (Ctrl+K)';
+  $('.topbar-actions').prepend(button);
+  const dialog = document.createElement('dialog'); dialog.className = 'modal quick-nav'; dialog.setAttribute('aria-label', 'Navegação rápida');
+  dialog.innerHTML = '<form method="dialog" class="quick-nav-header"><label>Encontre uma página<input type="search" id="quick-nav-search" placeholder="Hoje, finanças, estudos…" autocomplete="off"></label><button class="icon-button" aria-label="Fechar navegação rápida">×</button></form><div id="quick-nav-results"></div><p class="support-note">Tab para escolher · Enter para abrir · Esc para fechar</p>';
+  document.body.append(dialog);
+  const input = $('#quick-nav-search');
+  const render = () => {
+    const pages = $$('.nav-item').filter(item => matchesSearch(`${item.textContent} ${item.dataset.route}`, input.value));
+    $('#quick-nav-results').replaceChildren();
+    pages.forEach(page => { const item = document.createElement('button'); item.className = 'quick-nav-result'; item.textContent = page.textContent.trim(); item.onclick = () => { dialog.close(); setRoute(page.dataset.route); $('#page-title').tabIndex = -1; $('#page-title').focus({ preventScroll: true }); }; $('#quick-nav-results').append(item); });
+    if (!pages.length) $('#quick-nav-results').textContent = 'Nenhuma página encontrada.';
+  };
+  button.onclick = () => { input.value = ''; render(); dialog.showModal(); input.focus(); };
+  input.oninput = render;
+  input.onkeydown = event => { if (event.key === 'Enter') { event.preventDefault(); $('#quick-nav-results button')?.click(); } if (event.key === 'ArrowDown') { event.preventDefault(); $('#quick-nav-results button')?.focus(); } };
+  document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k' && !document.querySelector('dialog[open]')) { event.preventDefault(); button.click(); } });
 }
 setInterval(() => refreshVisibleNews(true), 5 * 60 * 1000);
 document.addEventListener('visibilitychange', () => refreshVisibleNews(false));
