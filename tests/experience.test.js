@@ -37,3 +37,21 @@ test('guide checks actual actions instead of example habit definitions', () => {
   assert.equal(run("(state=normalizeState({experience:{intention:'tarefas'},tasks:[{title:'Ação real'}]}),firstGuideActionDone())"), true);
   assert.equal(run("(state=normalizeState({experience:{intention:'hoje'}}),firstGuideActionDone())"), false);
 });
+
+test('3.0.1 accepts the new offline avatars and keeps unknown choices safe', () => {
+  const run = model();
+  assert.equal(run("normalizeState({profile:{avatar:'zoro'}}).profile.avatar"), 'zoro');
+  assert.equal(run("normalizeState({profile:{avatar:'sanji'}}).profile.avatar"), 'sanji');
+  assert.equal(run("normalizeState({profile:{avatar:'unknown'}}).profile.avatar"), 'frieren');
+  assert.equal(run("avatarPath('gojo')"), 'assets/pixel/avatar-gojo.png');
+});
+
+test('monthly agenda reads tasks from the selected date and day navigation is calendar safe', () => {
+  const run = model();
+  run("state=normalizeState({tasks:[{id:'a',title:'Dentista',date:'2026-10-20',status:'next',description:'Levar exames'},{id:'b',title:'Outro dia',date:'2026-10-21'}]})");
+  const agenda = run("renderCycleDayAgenda('2026-10-20')");
+  assert.match(agenda, /Dentista/);
+  assert.match(agenda, /Levar exames/);
+  assert.doesNotMatch(agenda, /Outro dia/);
+  assert.equal(run("shiftDay('2026-03-01',-1)"), '2026-02-28');
+});

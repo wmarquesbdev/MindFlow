@@ -5,10 +5,10 @@ const SYNC_PENDING_KEY = 'mindflow-sync-pending-v1';
 const PREVIOUS_STORAGE_KEYS = ['daydream-v1', 'norte-diario-v1'];
 const APP_NAME = 'MindFlow';
 const HOME_SCENES = [
-  { id: 'library', label: 'Biblioteca', detail: 'Aconchego para criar' },
-  { id: 'forest', label: 'Floresta', detail: 'Calma para respirar' },
-  { id: 'sky', label: 'Céu aberto', detail: 'Espaço para imaginar' },
-  { id: 'moon', label: 'Jardim lunar', detail: 'Silêncio para focar' }
+  { id: 'library', label: 'Biblioteca', detail: 'Ideia boa pede espaço' },
+  { id: 'forest', label: 'Floresta', detail: 'Respira e vai' },
+  { id: 'sky', label: 'Céu aberto', detail: 'Cabe mais ideia aqui' },
+  { id: 'moon', label: 'Jardim lunar', detail: 'Foco on, resto no mudo' }
 ];
 const START_INTENTIONS = [
   { id: 'tarefas', label: 'Organizar tarefas', action: 'Criar minha primeira tarefa' },
@@ -72,8 +72,8 @@ const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)]
 const clone = value => structuredClone(value);
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const escapeHTML = (value = '') => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
-const activeHabits = () => habitsForDay(DATE_KEY).filter(habit => habit.active !== false);
-const todayHabits = () => state.habits[DATE_KEY] || {};
+const activeHabits = (day = DATE_KEY) => habitsForDay(day).filter(habit => habit.active !== false || Object.hasOwn(state.habits[day] || {}, habit.id));
+const todayHabits = (day = DATE_KEY) => state.habits[day] || {};
 const progress = (current, total) => total ? Math.min(100, Math.round((Number(current) / Number(total)) * 100)) : 0;
 const asText = (value, fallback = '') => typeof value === 'string' ? value : fallback;
 
@@ -231,8 +231,8 @@ function makeDefaultCycle(definitions = []) {
     id: `cycle-${MONTH_KEY}`,
     month: MONTH_KEY,
     name: monthLabel(MONTH_KEY),
-    description: 'Um espaço simples para construir constância neste mês.',
-    goals: ['Escolher o que realmente importa'],
+    description: 'Seu mês, do seu jeito. Organize o que importa e deixa o resto respirar.',
+    goals: ['Fazer o que vale a pena'],
     accent: 'sage',
     habitIds: definitions.map(habit => habit.id)
   }, definitions);
@@ -494,6 +494,8 @@ let pipWindow = null;
 let newsRequest = null;
 let profilePhotoDraft = '';
 let selectedHistoryDate = DATE_KEY;
+let selectedTodayDate = DATE_KEY;
+let selectedCycleDay = DATE_KEY;
 let notesSearch = '';
 let notesCategory = 'all';
 let financeMonth = MONTH_KEY;
@@ -747,7 +749,31 @@ function formatDate(date = new Date()) {
 
 function renderDate() {
   $('#date-display').textContent = formatDate();
-  $('#today-date').textContent = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long' }).format(new Date());
+  const opened = dateFromKey(selectedTodayDate) || new Date();
+  $('#today-date').textContent = new Intl.DateTimeFormat('pt-BR', { day: 'numeric', month: 'long' }).format(opened);
+  if ($('#today-date-input')) {
+    $('#today-date-input').value = selectedTodayDate;
+    $('#today-date-input').max = DATE_KEY;
+    $('#today-next-day').disabled = selectedTodayDate >= DATE_KEY;
+    $('#today-back-now').hidden = selectedTodayDate === DATE_KEY;
+    $('#today-date-note').textContent = selectedTodayDate === DATE_KEY
+      ? 'Você está preenchendo hoje.'
+      : `Editando ${formatHistoryDate(selectedTodayDate, { weekday: 'long', day: 'numeric', month: 'long' })}.`;
+  }
+}
+
+function setTodayDate(day) {
+  if (!isDateKey(day) || day > DATE_KEY) return false;
+  selectedTodayDate = day;
+  renderDate(); renderCycles(); renderHabits(); renderJournalAndCheckin(); updateSummary(); renderPriorities();
+  return true;
+}
+
+function shiftDay(day, amount) {
+  const date = dateFromKey(day);
+  if (!date) return day;
+  date.setDate(date.getDate() + amount);
+  return date.toLocaleDateString('en-CA');
 }
 
 function greetingForNow() {
@@ -771,7 +797,7 @@ function renderProfile() {
   $('#profile-avatar').src = profileAvatarSrc();
   $('#home-avatar').src = profileAvatarSrc();
   $('#scene-avatar').src = profileAvatarSrc();
-  $('#home-profile-name').textContent = name ? `Um novo dia, ${name}.` : 'Seu espaço pessoal';
+  $('#home-profile-name').textContent = name ? `Bora, ${name}.` : 'Seu canto no MindFlow';
   $$('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
   $('#menu-toggle').innerHTML = icon('menu');
   $('#refresh-news').innerHTML = `${icon('refresh')} Atualizar`;
@@ -785,7 +811,7 @@ function renderHomeScene() {
   $('#home-scene-image').src = bannerPath(scene.id);
   $('#scene-title').textContent = scene.detail + '.';
   const next = getNextTask();
-  $('#scene-subtitle').textContent = next ? `Hoje, avance em: ${next.title}` : 'Hoje começa com um passo possível.';
+  $('#scene-subtitle').textContent = next ? `Na mira: ${next.title}` : 'Dia livre. Escolhe algo bom pra começar.';
   const hour = new Date().getHours();
   $('#home-scene').dataset.time = hour < 6 || hour >= 19 ? 'night' : hour < 11 ? 'morning' : 'day';
 }
@@ -823,7 +849,7 @@ function renderGuide() {
     { done: state.experience.visitedToday, text: 'Conhecer a página Hoje', action: 'today' }
   ];
   const done = steps.filter(step => step.done).length;
-  $('#guide-progress').textContent = done === steps.length ? 'Você já conhece o essencial. O resto aparece conforme precisar.' : `${done} de ${steps.length} passos · sem prazo e sem cobrança.`;
+  $('#guide-progress').textContent = done === steps.length ? 'Pegou o jeito. Agora deixa fluir.' : `${done} de ${steps.length} passos · faz no seu tempo.`;
   $('#guide-steps').innerHTML = steps.map(step => `<li class="${step.done ? 'is-done' : ''}"><span aria-hidden="true">${step.done ? '✓' : '○'}</span><strong>${escapeHTML(step.text)}</strong>${!step.done ? `<button type="button" data-guide="${step.action}">Começar →</button>` : ''}</li>`).join('');
   $$('[data-guide="first"]', panel).forEach(button => button.onclick = openGuideAction);
   $$('[data-guide="today"]', panel).forEach(button => button.onclick = () => setRoute('hoje'));
@@ -902,7 +928,7 @@ function applyTheme() {
   if ($('#home-studies')) $('#home-studies').hidden = state.settings.showHomeStudies === false || !state.learning.some(item => !item.total || item.current < item.total);
 }
 
-function completedHabitCount() { return activeHabits().filter(habit => todayHabits()[habit.id]).length; }
+function completedHabitCount(day = DATE_KEY) { return activeHabits(day).filter(habit => todayHabits(day)[habit.id]).length; }
 
 function updateSummary() {
   const total = activeHabits().length;
@@ -919,16 +945,21 @@ function updateSummary() {
   $('#metric-doing').textContent = doing;
   $('#metric-focus').textContent = `${focus} min`;
   $('#metric-learning').textContent = learning;
-  $('#today-score').textContent = `${percentage}%`;
-  $('#today-habit-progress').style.width = `${percentage}%`;
-  $('#today-habit-progress-text').textContent = total ? `${completed} de ${total} concluídos` : 'Adicione seu primeiro hábito';
+  const openedTotal = activeHabits(selectedTodayDate).length;
+  const openedCompleted = completedHabitCount(selectedTodayDate);
+  const openedPercentage = openedTotal ? Math.round((openedCompleted / openedTotal) * 100) : 0;
+  $('#today-score').textContent = `${openedPercentage}%`;
+  $('#today-habit-progress').style.width = `${openedPercentage}%`;
+  $('#today-habit-progress-text').textContent = openedTotal ? `${openedCompleted} de ${openedTotal} concluídos` : 'Nenhum hábito neste dia';
+  $('#today-habits-title').textContent = selectedTodayDate === DATE_KEY ? 'Hábitos de hoje' : `Hábitos de ${formatHistoryDate(selectedTodayDate, { day: 'numeric', month: 'short' })}`;
   $('#focus-minutes').textContent = `${focus} min`;
   renderDailyOverview();
 }
 
 function renderHabits() {
-  const habits = activeHabits();
-  const values = todayHabits();
+  const day = selectedTodayDate;
+  const habits = activeHabits(day);
+  const values = todayHabits(day);
   const visible = habits.filter(habit => !$('#habits-pending-only').checked || !values[habit.id]);
   $('#habits-list').innerHTML = visible.length ? visible.map(habit => `
     <label class="habit ${values[habit.id] ? 'done' : ''}">
@@ -938,26 +969,27 @@ function renderHabits() {
     </label>`).join('') : `<p class="updates-empty">${habits.length ? 'Tudo marcado por hoje. Desative o filtro para rever os hábitos.' : 'Nenhum hábito ativo. Use “Editar hábitos” para criar o primeiro.'}</p>`;
   $$('[data-habit-id]').forEach(input => input.addEventListener('change', event => {
     const id = event.target.dataset.habitId;
-    state.habits[DATE_KEY] = { ...todayHabits(), [id]: event.target.checked };
+    state.habits[day] = { ...todayHabits(day), [id]: event.target.checked };
     save(); renderHabits(); renderCycles(); renderHistoryPreview(); renderHistory(); updateSummary();
     const replacement = $$('[data-habit-id]').find(control => control.dataset.habitId === id);
     (replacement || $('#habits-pending-only')).focus({ preventScroll: true });
-    $('#habits-feedback').textContent = `${completedHabitCount()} de ${habits.length} concluídos`;
+    $('#habits-feedback').textContent = `${completedHabitCount(day)} de ${habits.length} concluídos`;
   }));
 }
 
 function renderJournalAndCheckin() {
-  const journal = state.journal[DATE_KEY] || {};
+  const day = selectedTodayDate;
+  const journal = state.journal[day] || {};
   const journalFields = { '#journal-did': 'did', '#journal-wins': 'wins', '#journal-improve': 'improve', '#journal-reflection': 'reflection', '#journal-tomorrow': 'tomorrow' };
   Object.entries(journalFields).forEach(([selector, key]) => { $(selector).value = journal[key] || ''; });
-  const checkin = state.checkin[DATE_KEY] || {};
+  const checkin = state.checkin[day] || {};
   $('#mood-input').value = checkin.mood || 'normal';
   $('#sleep-input').value = checkin.sleep || 'bom';
   $('#wake-input').value = checkin.wake || '';
   $('#water-input').value = checkin.water || '';
   Object.entries(journalFields).forEach(([selector, key]) => {
     $(selector).oninput = event => {
-      state.journal[DATE_KEY] = { ...(state.journal[DATE_KEY] || {}), [key]: event.target.value };
+      state.journal[day] = { ...(state.journal[day] || {}), [key]: event.target.value };
       save(); renderHistoryPreview(); renderHistory();
       const status = $('#journal-status'); status.textContent = 'salvo agora';
       clearTimeout(renderJournalAndCheckin.timer);
@@ -965,7 +997,7 @@ function renderJournalAndCheckin() {
     };
   });
   [['#mood-input', 'mood'], ['#sleep-input', 'sleep'], ['#wake-input', 'wake'], ['#water-input', 'water']].forEach(([selector, key]) => {
-    $(selector).onchange = event => { state.checkin[DATE_KEY] = { ...(state.checkin[DATE_KEY] || {}), [key]: event.target.value }; save(); renderHistoryPreview(); renderHistory(); };
+    $(selector).onchange = event => { state.checkin[day] = { ...(state.checkin[day] || {}), [key]: event.target.value }; save(); renderHistoryPreview(); renderHistory(); };
   });
 }
 
@@ -985,6 +1017,12 @@ function renderPriorities() {
   $('#home-focus-summary').textContent = `${state.focusMinutes[DATE_KEY] || 0} min de foco hoje`;
   $('#today-next-title').textContent = nextTask ? nextTask.title : 'Escolha a próxima ação.';
   $('#today-next-note').textContent = nextTask ? (nextTask.note || 'Defina um começo simples e inicie um bloco de foco.') : 'Capture uma tarefa, mova para “Próxima” e dê atenção a uma coisa por vez.';
+  const reviewing = selectedTodayDate !== DATE_KEY;
+  if (reviewing) {
+    $('#today-next-title').textContent = `Revendo ${formatHistoryDate(selectedTodayDate, { weekday: 'long', day: 'numeric', month: 'long' })}`;
+    $('#today-next-note').textContent = 'Marque o que rolou, ajuste as anotações e pronto. O histórico fica certinho.';
+  }
+  $('#today-start-focus').hidden = reviewing;
 }
 
 function priorityLabel(priority) { return priority === 'high' ? 'Prioridade' : priority === 'medium' ? 'Importante' : 'Quando der'; }
@@ -1163,6 +1201,16 @@ function cycleStats(cycle) {
   return { habits: habits.length, days: days.length, percentage: possible ? Math.round((completed / possible) * 100) : 0 };
 }
 
+function renderCycleDayAgenda(day) {
+  const tasks = state.tasks.filter(task => task.date === day).sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done') || Number(b.priority === 'high') - Number(a.priority === 'high'));
+  const list = tasks.length ? tasks.map(task => `<div class="month-agenda-item ${task.status === 'done' ? 'done' : ''}">
+    <input type="checkbox" data-cycle-task-done="${escapeHTML(task.id)}" ${task.status === 'done' ? 'checked' : ''} aria-label="Concluir ${escapeHTML(task.title)}" />
+    <button type="button" data-cycle-task-edit="${escapeHTML(task.id)}"><strong>${escapeHTML(task.title)}</strong><small>${task.description ? escapeHTML(task.description) : `${STATUS[task.status]} · ${task.area === 'work' ? 'trabalho' : 'pessoal'}`}</small></button>
+    <span class="badge ${task.priority}">${priorityLabel(task.priority)}</span>
+  </div>`).join('') : '<div class="month-agenda-empty"><strong>Dia livre por enquanto.</strong><span>Coloque só o que realmente precisa acontecer.</span></div>';
+  return `<section class="cycle-day-agenda"><header><div><span class="section-label">PLANO DO DIA</span><h3>${escapeHTML(formatHistoryDate(day))}</h3><p>${tasks.length ? `${tasks.length} ${tasks.length === 1 ? 'item planejado' : 'itens planejados'}` : 'Um espaço aberto para organizar o dia.'}</p></div><div class="inline-actions"><button type="button" class="text-button" id="cycle-day-edit-record" ${day > DATE_KEY ? 'hidden' : ''}>Revisar dia</button><button type="button" class="primary-button" id="cycle-day-add-task">+ Planejar tarefa</button></div></header><div class="month-agenda-list">${list}</div></section>`;
+}
+
 function renderCycles() {
   const calendarOpen = $('#active-cycle-overview .cycle-days')?.open;
   const selected = activeCycle();
@@ -1171,9 +1219,9 @@ function renderCycles() {
   const cycleName = $('#today-cycle-name');
   const cycleMonth = $('#today-cycle-month');
   const homeCycle = $('#home-cycle-label');
-  const todayCycle = cycleForDay(DATE_KEY);
-  if (cycleName) cycleName.textContent = todayCycle?.name || 'Crie o seu mês para começar';
-  if (cycleMonth) cycleMonth.textContent = monthLabel(MONTH_KEY);
+  const todayCycle = cycleForDay(selectedTodayDate);
+  if (cycleName) cycleName.textContent = todayCycle?.name || 'Crie este mês para começar';
+  if (cycleMonth) cycleMonth.textContent = monthLabel(selectedTodayDate.slice(0, 7));
   if (homeCycle) homeCycle.textContent = selected.name;
   const stats = cycleStats(selected);
   $('#active-cycle-overview').innerHTML = `${cycleCover(selected) ? `<img class="cycle-overview-banner" src="${escapeHTML(cycleCover(selected))}" alt="" />` : ''}<div class="cycle-overview-copy"><span class="soft-pill">Mês aberto · ${escapeHTML(monthName)}</span><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(selected.description || 'Defina uma intenção para este ciclo.')}</p><div class="cycle-goals">${selected.goals.length ? selected.goals.map(goal => `<span>○ ${escapeHTML(goal)}</span>`).join('') : '<span>Adicione metas ao editar este mês.</span>'}</div></div><div class="cycle-overview-stats"><strong>${stats.percentage}%</strong><span>consistência em ${stats.days} ${stats.days === 1 ? 'dia' : 'dias'}</span><small>${stats.habits} hábitos ativos</small><button class="secondary-button" data-manage-cycle-habits="${escapeHTML(selected.id)}">Configurar hábitos</button></div>`;
@@ -1184,19 +1232,27 @@ function renderCycles() {
   overview.append(hero);
   const calendar = document.createElement('details');
   calendar.className = 'cycle-days';
-  calendar.open = Boolean(calendarOpen);
+  calendar.open = calendarOpen === undefined ? true : Boolean(calendarOpen);
   const numberOfDays = new Date(Number(selected.month.slice(0, 4)), Number(selected.month.slice(5)), 0).getDate();
   const firstWeekday = new Date(selected.month + '-01T12:00:00').getDay();
-  calendar.innerHTML = '<summary>Ver registros do mês</summary><p class="support-note">Selecione um dia para consultar hábitos, foco e diário.</p><div class="cycle-days-grid">'
+  if (!selectedCycleDay.startsWith(selected.month)) selectedCycleDay = selected.month === MONTH_KEY ? DATE_KEY : `${selected.month}-01`;
+  calendar.innerHTML = '<summary>Calendário e planejamento do mês</summary><p class="support-note">Escolha um dia para planejar, revisar ou completar o que ficou para trás.</p><div class="cycle-days-grid">'
     + ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => '<span class="calendar-weekday">' + day + '</span>').join('')
     + '<span aria-hidden="true"></span>'.repeat(firstWeekday)
     + Array.from({ length: numberOfDays }, (_, index) => {
     const day = selected.month + '-' + String(index + 1).padStart(2, '0');
     const summary = daySummary(day);
-    return `<button type="button" data-cycle-day="${day}" class="${summary.hasData ? 'recorded' : ''}" ${day > DATE_KEY ? 'disabled' : ''} aria-label="${formatHistoryDate(day)}: ${summary.hasData ? summary.percentage + '% concluído' : 'sem registro'}"><span>${index + 1}</span><small>${summary.hasData ? summary.percentage + '%' : '—'}</small></button>`;
-  }).join('') + '</div>';
+    const tasks = state.tasks.filter(task => task.date === day);
+    const taskCopy = tasks.length ? `${tasks.length} ${tasks.length === 1 ? 'item' : 'itens'}` : '';
+    const dayCopy = [day <= DATE_KEY && summary.hasData ? `${summary.percentage}%` : '', taskCopy].filter(Boolean).join(' · ') || 'livre';
+    return `<button type="button" data-cycle-day="${day}" class="${summary.hasData ? 'recorded' : ''} ${tasks.length ? 'planned' : ''} ${day === selectedCycleDay ? 'selected' : ''}" aria-label="${formatHistoryDate(day)}: ${dayCopy}"><span>${index + 1}</span><small>${escapeHTML(dayCopy)}</small></button>`;
+  }).join('') + '</div>' + renderCycleDayAgenda(selectedCycleDay);
   $('#active-cycle-overview').append(calendar);
-  $$('[data-cycle-day]').forEach(button => button.onclick = () => { selectedHistoryDate = button.dataset.cycleDay; renderHistory(); setRoute('historico'); });
+  $$('[data-cycle-day]').forEach(button => button.onclick = () => { selectedCycleDay = button.dataset.cycleDay; renderCycles(); requestAnimationFrame(() => $('.cycle-day-agenda')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })); });
+  $$('[data-cycle-task-edit]').forEach(button => button.onclick = () => openTaskEditor(state.tasks.find(task => task.id === button.dataset.cycleTaskEdit)));
+  $$('[data-cycle-task-done]').forEach(input => input.onchange = () => moveTask(input.dataset.cycleTaskDone, input.checked ? 'done' : 'next'));
+  $('#cycle-day-add-task').onclick = () => { openTaskEditor(); $('#task-date-input').value = selectedCycleDay; $('#task-status-input').value = 'next'; };
+  if (selectedCycleDay <= DATE_KEY) $('#cycle-day-edit-record').onclick = () => { setTodayDate(selectedCycleDay); setRoute('hoje'); };
   const ordered = [...state.cycles].sort((a, b) => b.month.localeCompare(a.month));
   $('#cycles-grid').innerHTML = ordered.map(cycle => {
     const itemStats = cycleStats(cycle);
@@ -1208,7 +1264,7 @@ function renderCycles() {
     const image = cycleCover(cycle);
     if (image) cover.style.backgroundImage = `url(${JSON.stringify(image)})`;
   });
-  $$('[data-open-cycle]').forEach(button => button.onclick = () => { state.activeCycleId = button.dataset.openCycle; save(); renderAll(); $('#active-cycle-overview').scrollIntoView({ behavior: 'smooth' }); });
+  $$('[data-open-cycle]').forEach(button => button.onclick = () => { state.activeCycleId = button.dataset.openCycle; const cycle = state.cycles.find(item => item.id === state.activeCycleId); selectedCycleDay = cycle?.month === MONTH_KEY ? DATE_KEY : `${cycle?.month || MONTH_KEY}-01`; save(); renderAll(); $('#active-cycle-overview').scrollIntoView({ behavior: 'smooth' }); });
   $$('[data-edit-cycle]').forEach(button => button.onclick = () => openCycleEditor(state.cycles.find(cycle => cycle.id === button.dataset.editCycle)));
   $$('[data-manage-cycle-habits]').forEach(button => button.onclick = () => { state.activeCycleId = button.dataset.manageCycleHabits; save(); renderHabitManager(); openDialog('habit-dialog'); });
   const create = document.createElement('button');
@@ -1595,9 +1651,9 @@ function renderHistory() {
     <div class="history-habit-grid">${selected.habits.map(habit => `<span class="history-habit ${selected.values[habit.id] ? 'done' : ''}">${selected.values[habit.id] ? '✓' : '–'} ${escapeHTML(habit.title)}</span>`).join('')}</div>
     ${checkinFields.length ? `<div class="history-detail-section"><h3>Check-in</h3><dl>${checkinFields.map(([label, value]) => `<div><dt>${escapeHTML(label)}</dt><dd>${escapeHTML(value)}</dd></div>`).join('')}</dl></div>` : ''}
     ${journalFields.length ? `<div class="history-detail-section"><h3>Diário</h3>${journalFields.map(([label, key]) => `<div class="history-note"><strong>${escapeHTML(label)}</strong><p>${escapeHTML(selected.journal[key])}</p></div>`).join('')}</div>` : ''}
-    ${selected.day === DATE_KEY ? '<button class="text-button" data-route="hoje">Editar o registro de hoje →</button>' : ''}`;
-  const editTodayButton = $('[data-route="hoje"]', $('#history-detail'));
-  if (editTodayButton) editTodayButton.onclick = () => setRoute('hoje');
+    ${selected.day <= DATE_KEY ? `<button class="secondary-button" id="history-edit-day">${selected.day === DATE_KEY ? 'Editar hoje' : 'Completar este dia'} →</button>` : ''}`;
+  const editDayButton = $('#history-edit-day');
+  if (editDayButton) editDayButton.onclick = () => { setTodayDate(selected.day); setRoute('hoje'); };
 }
 function renderHistoryChart() {
   const chart = state.settings.historyView === 'chart';
@@ -2578,15 +2634,19 @@ function bindApp() {
   setMenuOpen(false);
   $('#theme-toggle').onclick = () => { state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark'; save(); applyTheme(); };
   $('#reset-habits').onclick = () => {
-    if (!completedHabitCount()) return;
-    if (!confirm('Limpar todas as marcações de hoje? Os dias anteriores serão mantidos.')) return;
-    const values = { ...todayHabits() }; activeHabits().forEach(habit => { values[habit.id] = false; });
-    state.habits[DATE_KEY] = values; save(); renderHabits(); renderHistoryPreview(); renderHistory(); updateSummary(); showToast('Hábitos de hoje foram limpos.');
+    if (!completedHabitCount(selectedTodayDate)) return;
+    if (!confirm(`Limpar as marcações de ${selectedTodayDate === DATE_KEY ? 'hoje' : formatHistoryDate(selectedTodayDate)}?`)) return;
+    const values = { ...todayHabits(selectedTodayDate) }; activeHabits(selectedTodayDate).forEach(habit => { values[habit.id] = false; });
+    state.habits[selectedTodayDate] = values; save(); renderHabits(); renderHistoryPreview(); renderHistory(); updateSummary(); showToast('Marcações deste dia foram limpas.');
   };
+  $('#today-prev-day').onclick = () => setTodayDate(shiftDay(selectedTodayDate, -1));
+  $('#today-next-day').onclick = () => setTodayDate(shiftDay(selectedTodayDate, 1));
+  $('#today-back-now').onclick = () => setTodayDate(DATE_KEY);
+  $('#today-date-input').onchange = event => { if (!setTodayDate(event.target.value)) { event.target.value = selectedTodayDate; showToast('Escolha hoje ou um dia anterior.'); } };
   $('#today-start-focus').onclick = () => { const task = getNextTask(); if (task) { state.focusTask = task.title; save(); } setRoute('foco'); $('#timer-start').focus(); };
   $('#today-cycle-strip [data-route]').addEventListener('click', () => {
-    const cycle = cycleForDay(DATE_KEY);
-    if (cycle) { state.activeCycleId = cycle.id; save(); renderCycles(); }
+    const cycle = cycleForDay(selectedTodayDate);
+    if (cycle) { state.activeCycleId = cycle.id; selectedCycleDay = selectedTodayDate; save(); renderCycles(); }
   });
   ['#task-filter', '#task-period', '#task-show-done'].forEach(selector => $(selector).onchange = () => { renderPlanner(); renderKanban(); });
   $$('[data-task-view]').forEach(button => button.onclick = () => { state.settings.taskView = button.dataset.taskView; save(); renderTaskView(); });
@@ -2653,7 +2713,9 @@ function refreshCalendarDay() {
   const day = new Date().toLocaleDateString('en-CA');
   if (day === DATE_KEY || document.querySelector('dialog[open]') || document.activeElement?.matches('input, textarea, select')) return;
   const wasCurrentFinanceMonth = financeMonth === MONTH_KEY;
+  const wasViewingToday = selectedTodayDate === DATE_KEY;
   DATE_KEY = day; MONTH_KEY = day.slice(0, 7); selectedHistoryDate = day;
+  if (wasViewingToday) selectedTodayDate = day;
   if (wasCurrentFinanceMonth) financeMonth = MONTH_KEY;
   renderAll(); loadNews({ force: false });
 }
@@ -2713,9 +2775,13 @@ function renderDailyOverview() {
 }
 function renderTodayTasks() {
   const list = $('#today-task-list'); if (!list) return;
-  const tasks = actionableTasks();
-  list.innerHTML = tasks.length ? tasks.slice(0, 5).map(task => `<div class="daily-task-row"><input type="checkbox" aria-label="Concluir ${escapeHTML(task.title)}" data-today-done="${escapeHTML(task.id)}"><button class="task-title-button" data-today-edit="${escapeHTML(task.id)}">${escapeHTML(task.title)}<small>${STATUS[task.status]} · ${task.date ? (task.date < DATE_KEY ? 'Prazo passou: ' : '') + formatTaskDate(task.date) : 'Sem data'}</small></button></div>`).join('') + (tasks.length > 5 ? `<p class="support-note">Mais ${tasks.length - 5} tarefas na página Tarefas.</p>` : '') : '<p class="updates-empty">Nenhuma tarefa prevista. Adicione uma pequena próxima ação.</p>';
-  $$('[data-today-done]').forEach(input => input.onchange = () => moveTask(input.dataset.todayDone, 'done'));
+  const reviewing = selectedTodayDate !== DATE_KEY;
+  const tasks = reviewing
+    ? state.tasks.filter(task => task.date === selectedTodayDate).sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done'))
+    : actionableTasks();
+  $('#today-tasks-title').textContent = reviewing ? `Tarefas de ${formatHistoryDate(selectedTodayDate, { day: 'numeric', month: 'short' })}` : 'Tarefas para hoje';
+  list.innerHTML = tasks.length ? tasks.slice(0, 5).map(task => `<div class="daily-task-row ${task.status === 'done' ? 'done' : ''}"><input type="checkbox" aria-label="Concluir ${escapeHTML(task.title)}" data-today-done="${escapeHTML(task.id)}" ${task.status === 'done' ? 'checked' : ''}><button class="task-title-button" data-today-edit="${escapeHTML(task.id)}">${escapeHTML(task.title)}<small>${STATUS[task.status]} · ${task.date ? (task.date < DATE_KEY && !reviewing ? 'Prazo passou: ' : '') + formatTaskDate(task.date) : 'Sem data'}</small></button></div>`).join('') + (tasks.length > 5 ? `<p class="support-note">Mais ${tasks.length - 5} tarefas no quadro completo.</p>` : '') : `<p class="updates-empty">Nada planejado para este dia. ${reviewing ? 'Se lembrar de algo, ainda dá para registrar.' : 'Coloque só o que merece atenção.'}</p>`;
+  $$('[data-today-done]').forEach(input => input.onchange = () => moveTask(input.dataset.todayDone, input.checked ? 'done' : 'next'));
   $$('[data-today-edit]').forEach(button => button.onclick = () => openTaskEditor(state.tasks.find(task => task.id === button.dataset.todayEdit)));
 }
 function showUndo(message, undo) {
@@ -2811,7 +2877,7 @@ function bindUX() {
   billFilter.innerHTML = '<option value="all">Todas as contas</option><option value="pending">A pagar</option><option value="paid">Pagas</option><option value="skipped">Ignoradas</option>';
   billFilter.onchange = filterFinanceRows; $('#finance-bills-view .section-heading').append(billFilter);
   $('#home-start-focus').onclick = () => $('#today-start-focus').click();
-  $('#today-add-task').onclick = () => { openTaskEditor(); $('#task-date-input').value = DATE_KEY; $('#task-status-input').value = 'next'; };
+  $('#today-add-task').onclick = () => { openTaskEditor(); $('#task-date-input').value = selectedTodayDate; $('#task-status-input').value = 'next'; };
   $('#focus-next-break').onclick = () => prepareFocusSession(5, 'break');
   $('#focus-next-work').onclick = () => prepareFocusSession(25, 'focus');
   // Retain the source of truth for duration when re-rendering after edits elsewhere.

@@ -24,7 +24,9 @@ Para testar o app desktop a partir do código, use `npm.cmd run desktop`. Para g
 
 ## O que tem
 
-**3.0 · Seu espaço, seu ritmo:** boas-vindas com apelido e avatar, escolha de cenário para a Home e ponto de partida, guia opcional que ensina enquanto você usa o app e um Estúdio para mudar a aparência depois. Tarefas agora têm descrição separada da próxima ação. Quem já usava o MindFlow mantém os dados e não precisa repetir a configuração.
+**3.0.1 · Seu mês no fluxo:** a tela Hoje agora abre dias anteriores para completar registros esquecidos. Em Meus meses, o calendário também funciona como agenda: planeje tarefas futuras, revise o que passou e mantenha tudo sincronizado com o quadro. A linguagem e o visual ficaram mais leves, e Zoro, Sanji, Nami e Gojo chegaram aos avatares offline.
+
+A experiência 3.0 continua presente: boas-vindas com apelido e avatar, cenários para a Home, guia opcional, Estúdio de personalização e descrição completa nas tarefas. Quem já usava o MindFlow mantém os dados e não precisa repetir a configuração.
 
 A Home pode mostrar uma paisagem em pixel art ou funcionar como painel compacto. Em **Personalizar**, mude cenário, cores, tipografia, tamanho, densidade e quais prévias aparecem no início. O guia pode ser dispensado ou reaberto quando quiser. Não há pontuação nem obrigação de completar os passos.
 

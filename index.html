@@ -60,9 +60,9 @@
           </div>
         </header>
 
-        <section class="view active" id="inicio" data-title="Seu espaço está pronto." data-kicker="SISTEMA PESSOAL">
+        <section class="view active" id="inicio" data-title="Seu canto, seu ritmo." data-kicker="TÁ TUDO AQUI">
           <div class="home-profile" hidden><img id="home-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="64" height="64" /><div><span class="section-label">Seu lugar, seu ritmo</span><p id="home-profile-name">Seu espaço pessoal</p></div><button class="text-button" id="edit-profile-home">Editar perfil</button></div>
-          <section class="home-scene" id="home-scene" aria-label="Seu espaço visual"><img id="home-scene-image" src="assets/pixel/banner-library.png" alt="" /><div class="home-scene-shade"></div><div class="home-scene-content"><span class="scene-eyebrow">SEU ESPAÇO · SEU RITMO</span><div class="scene-greeting"><img id="scene-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="52" height="52" /><div><h2 id="scene-title">Bem-vindo ao seu espaço.</h2><p id="scene-subtitle">Um passo de cada vez.</p></div></div><div class="scene-actions"><button type="button" id="scene-open-today">Abrir meu dia →</button><button type="button" id="scene-edit">Mudar cenário</button></div></div></section>
+          <section class="home-scene" id="home-scene" aria-label="Seu espaço visual"><img id="home-scene-image" src="assets/pixel/banner-library.png" alt="" /><div class="home-scene-shade"></div><div class="home-scene-content"><span class="scene-eyebrow">SEU ESPAÇO · SEU RITMO</span><div class="scene-greeting"><img id="scene-avatar" src="assets/pixel/avatar-frieren.png" alt="" width="52" height="52" /><div><h2 id="scene-title">Bem-vindo ao seu espaço.</h2><p id="scene-subtitle">Bora fazer o dia valer.</p></div></div><div class="scene-actions"><button type="button" id="scene-open-today">Abrir meu dia →</button><button type="button" id="scene-edit">Mudar cenário</button></div></div></section>
           <div id="home-overview" class="overview-grid" aria-label="Resumo de hoje"></div>
           <div class="hero-grid">
             <article class="hero-copy card">
@@ -80,7 +80,7 @@
             </article>
           </div>
 
-          <article class="card home-guide" id="home-guide" hidden><div><span class="section-label">PRIMEIROS PASSOS</span><h2>Aprenda usando o seu próprio espaço.</h2><p id="guide-progress">Um passo de cada vez, sem prazo.</p></div><ol id="guide-steps"></ol><button type="button" class="text-button" id="guide-dismiss">Dispensar guia</button></article>
+          <article class="card home-guide" id="home-guide" hidden><div><span class="section-label">PRIMEIROS PASSOS</span><h2>Aprenda mexendo. É bem mais rápido.</h2><p id="guide-progress">No seu ritmo, sem tutorial infinito.</p></div><ol id="guide-steps"></ol><button type="button" class="text-button" id="guide-dismiss">Dispensar guia</button></article>
 
           <article class="card home-bill-reminder" id="home-bill-reminder" hidden><div class="section-heading"><div><span class="section-label">CONTAS PARA CONFERIR</span><p id="home-bill-message"></p></div><button type="button" class="text-button" id="home-open-bills">Ver contas →</button></div><div id="home-bill-list" class="home-bill-list"></div></article>
 
@@ -118,12 +118,19 @@
           </article>
         </section>
 
-        <section class="view" id="hoje" data-title="Meu dia" data-kicker="O QUE IMPORTA AGORA">
+        <section class="view" id="hoje" data-title="Meu dia" data-kicker="HOJE, SEM COMPLICAÇÃO">
+          <nav class="today-date-nav" aria-label="Escolher dia para editar">
+            <button type="button" class="icon-button" id="today-prev-day" aria-label="Dia anterior">‹</button>
+            <label><span>Dia aberto</span><input type="date" id="today-date-input" /></label>
+            <button type="button" class="icon-button" id="today-next-day" aria-label="Próximo dia">›</button>
+            <button type="button" class="text-button" id="today-back-now" hidden>Voltar para hoje</button>
+            <small id="today-date-note">Você está preenchendo hoje.</small>
+          </nav>
           <article class="today-hero card">
             <div>
               <p class="section-label">MEU DIA · <span id="today-date"></span></p>
               <h2 id="today-next-title">Escolha a próxima ação.</h2>
-              <p id="today-next-note">Um dia produtivo começa com uma decisão simples.</p>
+              <p id="today-next-note">Escolhe uma e manda ver.</p>
             </div>
             <div class="today-hero-actions">
               <div class="today-total"><strong id="today-score">0%</strong><span>hábitos</span></div>
@@ -136,12 +143,12 @@
             <button class="text-button" data-route="ciclos">Ver ciclo →</button>
           </article>
           <article class="card habits-card today-habits-card">
-            <div class="section-heading"><div><p class="section-label">ESSENCIAL</p><h2>Hábitos de hoje</h2><p>Marque o que aconteceu. O resto pode esperar.</p></div><div class="habit-actions"><button class="text-button" id="open-habit-manager">Editar hábitos</button><button class="text-button subtle-action" id="reset-habits">Limpar dia</button></div></div>
+            <div class="section-heading"><div><p class="section-label">CHECK DO DIA</p><h2 id="today-habits-title">Hábitos de hoje</h2><p>Marque o que rolou. Sem drama.</p></div><div class="habit-actions"><button class="text-button" id="open-habit-manager">Editar hábitos</button><button class="text-button subtle-action" id="reset-habits">Limpar dia</button></div></div>
             <div class="today-habit-progress"><span id="today-habit-progress-text">0 de 0 concluídos</span><div class="progress-track"><span id="today-habit-progress"></span></div></div>
             <div class="inline-actions habit-filter"><label class="checkbox-label"><input type="checkbox" id="habits-pending-only"> Mostrar só os que faltam</label><span id="habits-feedback" role="status"></span></div>
             <div id="habits-list" class="habits-list"></div>
           </article>
-          <article class="card today-tasks"><div class="section-heading"><div><span class="section-label">UMA COISA POR VEZ</span><h2>Tarefas para hoje</h2></div><button class="secondary-button" id="today-add-task">+ Tarefa de hoje</button></div><div id="today-task-list"></div><button class="text-button" data-route="tarefas">Ver todas as tarefas →</button></article>
+          <article class="card today-tasks"><div class="section-heading"><div><span class="section-label">NA MIRA</span><h2 id="today-tasks-title">Tarefas para hoje</h2></div><button class="secondary-button" id="today-add-task">+ Colocar neste dia</button></div><div id="today-task-list"></div><button class="text-button" data-route="tarefas">Abrir quadro completo →</button></article>
           <article class="card today-history-card">
             <div class="section-heading"><div><p class="section-label">ÚLTIMOS 7 DIAS</p><h2>Seu ritmo recente</h2><p id="history-preview-copy">Registre um pouco por dia para enxergar padrões.</p></div><button class="text-button" data-route="historico">Ver histórico →</button></div>
             <div id="history-week-preview" class="history-week-preview" aria-label="Resumo dos últimos sete dias"></div>
@@ -170,14 +177,14 @@
           </details>
         </section>
 
-        <section class="view" id="ciclos" data-title="Ciclos mensais" data-kicker="CONSTRUA UM MÊS DE CADA VEZ">
-          <div class="section-heading page-intro"><div><span class="section-label">Seus meses</span><h2>Cada mês pode ter uma intenção diferente.</h2><p>Crie um ciclo com identidade, metas e hábitos próprios. Seu histórico continua guardado.</p></div><button class="primary-button" id="open-cycle-form">+ Novo mês</button></div>
+        <section class="view" id="ciclos" data-title="Meus meses" data-kicker="SEU MÊS, DO SEU JEITO">
+          <div class="section-heading page-intro"><div><span class="section-label">Mapa do mês</span><h2>Planeje sem transformar a vida numa planilha.</h2><p>Metas, hábitos e o que não pode ser esquecido — tudo no mesmo calendário.</p></div><button class="primary-button" id="open-cycle-form">+ Novo mês</button></div>
           <article class="card active-cycle-overview" id="active-cycle-overview"></article>
           <div class="section-heading cycles-list-heading"><div><span class="section-label">Arquivo de ciclos</span><h2>Meses criados</h2></div><label>Buscar mês<input type="search" id="cycle-search" placeholder="Nome, ano ou intenção…"></label></div>
           <div class="cycles-grid" id="cycles-grid"></div>
         </section>
 
-        <section class="view" id="historico" data-title="Seu histórico" data-kicker="CONTINUIDADE, NÃO PERFEIÇÃO">
+        <section class="view" id="historico" data-title="Seu histórico" data-kicker="O QUE ROLOU DE VERDADE">
           <div class="section-heading history-intro"><div><p class="section-label">VISÃO GERAL</p><h2>Veja os dias como uma sequência</h2><p>Hábitos, foco, check-in e diário ficam reunidos para você perceber o que funcionou.</p></div><button class="secondary-button" data-route="hoje">Voltar para hoje</button></div>
           <div class="history-metrics-grid">
             <article class="card history-metric"><span>Dias registrados</span><strong id="history-days-count">0</strong><small>desde o início</small></article>
@@ -190,7 +197,7 @@
           </div>
         </section>
 
-        <section class="view" id="tarefas" data-title="Minhas tarefas" data-kicker="UMA COISA POR VEZ">
+        <section class="view" id="tarefas" data-title="Minhas tarefas" data-kicker="TIRA DA CABEÇA. COLOCA NO FLUXO.">
           <div class="section-heading page-intro"><div><h2>Da ideia ao feito.</h2><p>As mesmas tarefas, na visualização que funciona para você.</p></div><button class="primary-button" id="open-task-form">+ Nova tarefa</button></div>
           <div class="tasks-toolbar">
             <label>Buscar<input type="search" id="task-search" placeholder="Título ou descrição…"></label>
@@ -209,7 +216,7 @@
           </div></div>
         </section>
 
-        <section class="view" id="financas" data-title="Meu dinheiro" data-kicker="CONTROLE SIMPLES">
+        <section class="view" id="financas" data-title="Meu dinheiro" data-kicker="DINHEIRO SEM MISTÉRIO">
           <div class="section-heading page-intro"><div><h2>Seu mês, em poucas decisões.</h2><p>Registre entradas, acompanhe vencimentos e confira o que realmente saiu da conta.</p></div></div>
           <div class="finance-quick-actions" aria-label="Ações financeiras"><button type="button" class="primary-button" id="finance-add-income">+ Entrada</button><button type="button" class="secondary-button" id="finance-add-expense">+ Gasto</button><button type="button" class="secondary-button" id="finance-add-bill">+ Conta a pagar</button><button type="button" class="secondary-button" id="finance-add-invoice">+ Fatura do cartão</button><button type="button" class="text-button" id="finance-read-document">Ler documento</button></div>
           <div class="finance-insight card" id="finance-insight" aria-live="polite"></div>
@@ -231,13 +238,13 @@
           <p class="support-note">Tudo é manual e fica neste PC. Compra no cartão não desconta da conta; só pagar a fatura faz isso. Confira os valores com seu banco.</p>
         </section>
 
-        <section class="view" id="biblioteca" data-title="Aprendizado" data-kicker="LEITURA E CURSOS">
+        <section class="view" id="biblioteca" data-title="Aprendizado" data-kicker="NO SEU RITMO, MAS ANDANDO">
           <div class="section-heading"><div><p class="section-label">CONHECIMENTO EM MOVIMENTO</p><h2>Construa seu repertório</h2></div><button class="primary-button" id="open-learning-form">+ Adicionar item</button></div>
           <div class="library-toolbar"><div class="library-tabs" aria-label="Tipos de estudo"><button class="library-tab active" data-library="all" aria-pressed="true">Todos</button><button class="library-tab" data-library="reading" aria-pressed="false">Leitura</button><button class="library-tab" data-library="course" aria-pressed="false">Cursos</button></div><input id="learning-search" type="search" placeholder="Buscar estudo…" aria-label="Buscar estudo"><select id="learning-category-filter" aria-label="Filtrar categoria"><option value="all">Todas as categorias</option></select><select id="learning-status-filter" aria-label="Filtrar andamento"><option value="all">Todo andamento</option><option value="active">Em aberto</option><option value="done">Concluídos</option></select></div><p id="learning-summary" class="support-note"></p>
           <div class="library-grid" id="library-list"></div>
         </section>
 
-        <section class="view" id="foco" data-title="Foco" data-kicker="PRESENÇA INTENCIONAL">
+        <section class="view" id="foco" data-title="Foco" data-kicker="ENTRA NO MODO">
           <div class="focus-layout">
             <article class="timer-card card">
               <p class="section-label">POMODORO</p><h2 id="timer-mode">Hora de focar</h2>
@@ -253,7 +260,7 @@
           </div>
         </section>
 
-        <section class="view" id="autocuidado" data-title="Autocuidado" data-kicker="UM PASSO DE CADA VEZ">
+        <section class="view" id="autocuidado" data-title="Autocuidado" data-kicker="SE CUIDAR TAMBÉM CONTA">
           <div class="section-heading page-intro"><div><h2>Escolha o que quer mudar, sem julgamentos.</h2><p>Observe impulsos e gatilhos, prepare uma alternativa e retome quando precisar. Este espaço não faz diagnósticos.</p></div><button type="button" class="primary-button" id="care-new-goal">+ Novo objetivo</button></div>
           <div id="care-empty" class="card care-empty"><h3>Comece com uma escolha sua</h3><p>Você pode acompanhar qualquer comportamento que queira reduzir ou interromper. Nenhum tema vem cadastrado por padrão.</p><button type="button" class="secondary-button" id="care-empty-add">Criar objetivo</button></div>
           <div id="care-content" hidden><div id="care-goals" class="care-goals" aria-label="Objetivos de autocuidado"></div><div class="care-layout"><article class="card care-main"><span class="section-label">SEU PLANO</span><h2 id="care-title"></h2><p id="care-reason"></p><div class="care-actions"><button type="button" class="primary-button" id="care-pause">Estou com vontade agora</button><button type="button" class="secondary-button" id="care-log-episode">Registrar ocorrência</button></div><div id="care-pause-panel" class="care-pause-panel" hidden><p class="section-label">PAUSA DE 5 MINUTOS</p><h3>Dê um pequeno espaço entre vontade e ação.</h3><strong id="care-pause-timer">05:00</strong><p id="care-alternative"></p><div class="care-actions"><button type="button" class="secondary-button" id="care-open-studies">Abrir estudos</button><button type="button" class="secondary-button" id="care-open-notes">Escrever uma nota</button><button type="button" class="text-button" id="care-urge-done">Atravessei este impulso</button></div></div><div class="care-next"><h3>Se a vontade vier de novo</h3><p id="care-plan"></p><button type="button" class="text-button" id="care-edit-goal">Editar meu plano</button></div></article><aside class="care-side"><article class="card care-stats"><span class="section-label">ÚLTIMOS 7 DIAS</span><div class="care-stats-grid"><div><strong id="care-urges">0</strong><span>impulsos atravessados</span></div><div><strong id="care-episodes">0</strong><span>ocorrências registradas</span></div></div><p id="care-last-episode"></p></article><article class="card care-history"><div class="section-heading"><div><span class="section-label">REGISTROS</span><h2>O que aconteceu</h2></div></div><div id="care-event-list"></div></article></aside></div></div>
@@ -261,18 +268,18 @@
           <p class="support-note">Dados sensíveis ficam no arquivo local e entram no backup JSON. Se o comportamento causa sofrimento ou prejudica sua vida, procurar apoio profissional pode ajudar. Uma ocorrência não apaga seu progresso. Para tabagismo, conheça o <a href="https://www.gov.br/inca/pt-br/assuntos/causas-e-prevencao-do-cancer/tabagismo/como-parar-de-fumar" target="_blank" rel="noopener noreferrer">apoio do SUS</a>.</p>
         </section>
 
-        <section class="view" id="visao" data-title="Visão e direção" data-kicker="O LONGO PRAZO GUIA O DIA">
+        <section class="view" id="visao" data-title="Visão e direção" data-kicker="ONDE VOCÊ QUER CHEGAR">
           <div class="vision-intro"><p class="section-label">QUADRO DOS SONHOS</p><h2>Não são desejos soltos.<br />São direções que merecem espaço.</h2></div>
           <div class="dream-grid" id="dream-grid"></div>
           <article class="card ikigai-card"><div><p class="section-label">IKIGAI</p><h2>Minha razão de ser</h2><p>Aproxime paixão, missão, vocação e profissão — sem exigir uma resposta perfeita.</p></div><div class="ikigai-fields"><label>O que eu amo?<textarea data-ikigai="love" placeholder="Paixão"></textarea></label><label>O que o mundo precisa?<textarea data-ikigai="mission" placeholder="Missão"></textarea></label><label>No que sou bom?<textarea data-ikigai="vocation" placeholder="Vocação"></textarea></label><label>Pelo que posso ser pago?<textarea data-ikigai="profession" placeholder="Profissão"></textarea></label><label class="ikigai-wide">Minha intersecção hoje<textarea data-ikigai="answer" placeholder="Meu Ikigai, em construção..."></textarea></label></div></article>
         </section>
-        <section class="view" id="notas" data-title="Notas livres" data-kicker="UM LUGAR PARA PENSAR">
+        <section class="view" id="notas" data-title="Notas livres" data-kicker="JOGA A IDEIA AQUI">
           <div class="section-heading page-intro"><div><span class="section-label">Caderno pessoal</span><h2>Ideias não precisam nascer organizadas.</h2><p>Registre primeiro. Encontre, categorize e refine depois.</p></div><button class="primary-button" id="open-note-form">+ Nova nota</button></div>
           <div class="notes-toolbar"><label class="search-field">⌕<input id="notes-search" type="search" placeholder="Buscar nas notas..." /></label><select id="notes-category-filter" aria-label="Filtrar categoria"><option value="all">Todas as categorias</option></select></div>
           <div class="notes-layout"><div class="notes-grid" id="notes-list"></div><div class="notes-side"><aside class="card updates-card notes-updates"><div class="section-heading"><div><span class="section-label">Registro rápido</span><h2>Pequenas evoluções</h2></div><button class="icon-button" id="add-update" aria-label="Adicionar atualização">+</button></div><div id="updates-list" class="updates-list"></div></aside><aside class="card quote-card"><span class="quote-mark">“</span><blockquote id="daily-quote-text">A tranquilidade também é uma forma de progresso.</blockquote><div><cite id="daily-quote-author">MindFlow</cite><button class="text-button" id="next-quote">Outra frase</button></div></aside></div></div>
         </section>
 
-        <section class="view" id="noticias" data-title="Últimas notícias" data-kicker="INFORMAÇÃO SEM PRESSA">
+        <section class="view" id="noticias" data-title="Últimas notícias" data-kicker="O QUE TÁ ROLANDO">
           <div class="section-heading page-intro"><div><span class="section-label">Leitura do dia</span><h2>Informação no seu ritmo.</h2><p>Atualização automática a cada 5 minutos enquanto esta tela está aberta. Abra a matéria para ler no veículo original.</p></div><button class="secondary-button" id="refresh-news-page">↻ Atualizar agora</button></div>
           <article class="card news-page-card">
             <div class="news-page-toolbar"><div class="news-controls page-news-controls"><label for="news-topic-page">Assunto</label><select id="news-topic-page"><option value="brazil">Brasil</option><option value="technology">Tecnologia</option><option value="business">Economia</option><option value="world">Mundo</option></select><span id="news-status-page" aria-live="polite"></span></div></div>
@@ -281,7 +288,7 @@
           </article>
         </section>
 
-        <section class="view" id="personalizar" data-title="Personalizar" data-kicker="O SISTEMA SE ADAPTA A VOCÊ">
+        <section class="view" id="personalizar" data-title="Personalizar" data-kicker="DEIXA COM A SUA CARA">
           <div class="section-heading page-intro"><div><span class="section-label">Ateliê do espaço</span><h2>Deixe o MindFlow confortável para você.</h2><p>As escolhas ficam neste PC e podem ser alteradas quando quiser.</p></div></div>
           <article class="card scene-studio"><div><span class="section-label">SEU CENÁRIO</span><h3>Uma paisagem para voltar.</h3><p>Arte para dar identidade à sua Home. Os controles e seus dados continuam simples e locais.</p><div class="scene-studio-actions"><button type="button" class="secondary-button" id="replay-welcome">Refazer boas-vindas</button><button type="button" class="text-button" id="reopen-guide">Mostrar guia na Home</button></div></div><div class="scene-picker" id="scene-picker" role="group" aria-label="Escolher cenário"></div></article>
           <div class="customize-grid">
@@ -309,7 +316,7 @@
       <form id="profile-form">
         <div class="modal-header"><div><p class="section-label" id="profile-dialog-kicker">BEM-VINDO</p><h2 id="profile-dialog-title">Bem-vindo ao MindFlow</h2><p id="profile-dialog-copy">Escolha um apelido e um avatar. Sem conta, sem senha.</p></div></div>
         <div class="profile-art" role="img" aria-label="Paisagem em pixel art de uma biblioteca acolhedora"><img src="assets/pixel/banner-library.png" alt="" /></div><label for="profile-name-input">Seu apelido<input id="profile-name-input" name="name" autocomplete="nickname" maxlength="48" required placeholder="Como quer ser chamado?" /></label>
-        <fieldset class="avatar-fieldset"><legend>Escolha um personagem</legend><p class="avatar-hint">Oito retratos em pixel art, de anime e histórias clássicas. Ou use sua foto.</p><div class="avatar-picker" id="avatar-picker"></div></fieldset><input type="hidden" id="profile-avatar-input" value="frieren" /><input id="profile-photo-input" type="file" accept="image/png,image/jpeg,image/webp" hidden /><button type="button" class="avatar-upload-choice" id="choose-profile-photo" aria-pressed="false"><img id="profile-photo-preview" alt="" width="44" height="44" hidden /><span class="avatar-upload-icon" aria-hidden="true">+</span><span><strong id="profile-photo-label">Enviar foto</strong><small>PNG, JPG ou WebP · fica só neste PC</small></span></button>
+        <fieldset class="avatar-fieldset"><legend>Escolha um personagem</legend><p class="avatar-hint">Retratos em pixel art de anime e histórias clássicas. Ou use sua foto.</p><div class="avatar-picker" id="avatar-picker"></div></fieldset><input type="hidden" id="profile-avatar-input" value="frieren" /><input id="profile-photo-input" type="file" accept="image/png,image/jpeg,image/webp" hidden /><button type="button" class="avatar-upload-choice" id="choose-profile-photo" aria-pressed="false"><img id="profile-photo-preview" alt="" width="44" height="44" hidden /><span class="avatar-upload-icon" aria-hidden="true">+</span><span><strong id="profile-photo-label">Enviar foto</strong><small>PNG, JPG ou WebP · fica só neste PC</small></span></button>
         <p class="modal-hint">Sem senha ou cadastro. Seu perfil fica neste PC.</p>
         <div class="modal-actions"><button type="button" id="profile-cancel" class="secondary-button" hidden>Cancelar</button><button id="profile-submit" class="primary-button">Entrar no meu espaço</button></div>
       </form>
