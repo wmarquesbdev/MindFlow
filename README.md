@@ -14,21 +14,27 @@ Um espaço pessoal para organizar hábitos, tarefas, finanças e foco. Funciona 
 ```powershell
 git clone https://github.com/wmarquesbdev/MindFlow.git
 cd MindFlow
-npm.cmd install
+npm.cmd ci
 npm.cmd start
 ```
 
 Abra `http://127.0.0.1:3177`. No PowerShell, use `npm.cmd` se a execução de scripts estiver bloqueada.
 
+Para testar o app desktop a partir do código, use `npm.cmd run desktop`. Para gerar um instalador Windows local, use `npm.cmd run make`.
+
 ## O que tem
 
-**2.9 · Menos cliques, mais clareza:** início com resumo acionável, tarefas dentro do Hoje, ações fixas nos meses, busca em tarefas e finanças, navegação rápida (`Ctrl+K`) e progresso de estudos arrastável, com ajuste pelo teclado e opção de desfazer.
+**3.0 · Seu espaço, seu ritmo:** boas-vindas com apelido e avatar, escolha de cenário para a Home e ponto de partida, guia opcional que ensina enquanto você usa o app e um Estúdio para mudar a aparência depois. Tarefas agora têm descrição separada da próxima ação. Quem já usava o MindFlow mantém os dados e não precisa repetir a configuração.
+
+A Home pode mostrar uma paisagem em pixel art ou funcionar como painel compacto. Em **Personalizar**, mude cenário, cores, tipografia, tamanho, densidade e quais prévias aparecem no início. O guia pode ser dispensado ou reaberto quando quiser. Não há pontuação nem obrigação de completar os passos.
 
 Hábitos por mês com capas, tarefas em lista ou Kanban, notas, estudos com progresso, histórico em gráfico, Pomodoro com mini timer na área de trabalho e notícias atualizadas a cada 5 minutos enquanto a página está em uso. Personalize cores, leitura e página inicial. Inclui autocuidado e controle simples de conta, Pix, boletos e cartão. Comprovantes podem ser anexados; a leitura local apenas sugere valores e vencimentos — confirme sempre com o original.
 
 ## Atualizar
 
 A partir da **2.8.0 instalada no Windows**, o app verifica e baixa novas versões em segundo plano. Em **Personalizar**, consulte o estado e reinicie para aplicar. Quem usa 2.7 ou anterior precisa instalar a 2.8 uma vez. Durante o foco, minimize o app para manter o timer ativo; fechar o aplicativo encerra o timer.
+
+Alterações feitas neste código local não chegam automaticamente a outros PCs. Para distribuir a 3.0, é preciso gerar e publicar uma release Windows completa; o instalador ainda não é assinado.
 
 ## Seus dados
 

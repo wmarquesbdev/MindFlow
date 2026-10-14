@@ -4,6 +4,20 @@ const SYNC_MARKER_KEY = 'mindflow-sync-v1';
 const SYNC_PENDING_KEY = 'mindflow-sync-pending-v1';
 const PREVIOUS_STORAGE_KEYS = ['daydream-v1', 'norte-diario-v1'];
 const APP_NAME = 'MindFlow';
+const HOME_SCENES = [
+  { id: 'library', label: 'Biblioteca', detail: 'Aconchego para criar' },
+  { id: 'forest', label: 'Floresta', detail: 'Calma para respirar' },
+  { id: 'sky', label: 'Céu aberto', detail: 'Espaço para imaginar' },
+  { id: 'moon', label: 'Jardim lunar', detail: 'Silêncio para focar' }
+];
+const START_INTENTIONS = [
+  { id: 'tarefas', label: 'Organizar tarefas', action: 'Criar minha primeira tarefa' },
+  { id: 'hoje', label: 'Cuidar dos hábitos', action: 'Registrar meu primeiro hábito' },
+  { id: 'foco', label: 'Encontrar foco', action: 'Iniciar um bloco de foco' },
+  { id: 'biblioteca', label: 'Continuar estudando', action: 'Adicionar um estudo' },
+  { id: 'financas', label: 'Organizar meu dinheiro', action: 'Abrir minhas finanças' },
+  { id: 'autocuidado', label: 'Cuidar de mim', action: 'Criar um plano de cuidado' }
+];
 const LOCAL_SERVER_PORT = '3177';
 let DATE_KEY = new Date().toLocaleDateString('en-CA');
 let MONTH_KEY = DATE_KEY.slice(0, 7);
@@ -28,7 +42,8 @@ const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' 
 
 const defaultState = {
   profile: { name: '', avatar: 'frieren', photo: '' },
-  settings: { theme: 'light', newsTopic: 'brazil', accent: 'sage', density: 'comfortable', fontScale: 'medium', showNews: true, showHomeStudies: true, reducedMotion: false, quoteOffset: 0, taskView: 'board', taskViewVersion: 2, surface: 'soft', fontFamily: 'sans', contentWidth: 'balanced', startPage: 'inicio', focusDuration: 25, historyView: 'list' },
+  experience: { configured: false, scene: 'library', intention: 'tarefas', guideDismissed: false, visitedToday: false },
+  settings: { theme: 'light', newsTopic: 'brazil', accent: 'sage', density: 'comfortable', fontScale: 'medium', showNews: true, showHomeStudies: true, showHomeScene: true, reducedMotion: false, quoteOffset: 0, taskView: 'board', taskViewVersion: 2, surface: 'soft', fontFamily: 'sans', contentWidth: 'balanced', startPage: 'inicio', focusDuration: 25, historyView: 'list' },
   habitDefinitions: DEFAULT_HABITS,
   habits: {}, journal: {}, checkin: {}, updates: [], focusMinutes: {}, rituals: {}, focusTask: '', newsCache: {},
   tasks: [],
@@ -166,7 +181,8 @@ function normalizeTask(task = {}) {
     priority: ['high', 'medium', 'low'].includes(source.priority) ? source.priority : 'medium',
     status,
     date: /^\d{4}-\d{2}-\d{2}$/.test(asText(source.date)) ? source.date : '',
-    note: asText(source.note)
+    note: asText(source.note),
+    description: asText(source.description)
   };
 }
 
@@ -418,6 +434,14 @@ function normalizeState(incoming = {}) {
   });
   return {
     ...base, ...incoming,
+    experience: {
+      ...base.experience,
+      configured: incoming.experience?.configured === undefined ? Boolean(incoming.profile?.name) : Boolean(incoming.experience.configured),
+      scene: ['library', 'forest', 'sky', 'moon'].includes(incoming.experience?.scene) ? incoming.experience.scene : 'library',
+      intention: ['tarefas', 'hoje', 'foco', 'biblioteca', 'financas', 'autocuidado'].includes(incoming.experience?.intention) ? incoming.experience.intention : 'tarefas',
+      guideDismissed: Boolean(incoming.experience?.guideDismissed),
+      visitedToday: Boolean(incoming.experience?.visitedToday)
+    },
     profile: {
       name: asText(incoming.profile?.name).trim().slice(0, 48),
       avatar: incoming.profile?.avatar === 'custom' && safeAvatarData(incoming.profile?.photo) ? 'custom'
@@ -746,6 +770,7 @@ function renderProfile() {
   $('#page-kicker').textContent = view?.dataset.kicker || 'SISTEMA PESSOAL';
   $('#profile-avatar').src = profileAvatarSrc();
   $('#home-avatar').src = profileAvatarSrc();
+  $('#scene-avatar').src = profileAvatarSrc();
   $('#home-profile-name').textContent = name ? `Um novo dia, ${name}.` : 'Seu espaço pessoal';
   $$('[data-icon]').forEach(element => { element.innerHTML = icon(element.dataset.icon); });
   $('#menu-toggle').innerHTML = icon('menu');
@@ -753,6 +778,107 @@ function renderProfile() {
   $('#refresh-news').setAttribute('aria-label', 'Atualizar notícias');
   $('#profile-button').setAttribute('aria-label', name ? `Editar perfil de ${name}` : 'Definir seu nome');
   $('#profile-button').setAttribute('title', name ? `Editar perfil de ${name}` : 'Definir seu nome');
+}
+
+function renderHomeScene() {
+  const scene = HOME_SCENES.find(item => item.id === state.experience.scene) || HOME_SCENES[0];
+  $('#home-scene-image').src = bannerPath(scene.id);
+  $('#scene-title').textContent = scene.detail + '.';
+  const next = getNextTask();
+  $('#scene-subtitle').textContent = next ? `Hoje, avance em: ${next.title}` : 'Hoje começa com um passo possível.';
+  const hour = new Date().getHours();
+  $('#home-scene').dataset.time = hour < 6 || hour >= 19 ? 'night' : hour < 11 ? 'morning' : 'day';
+}
+
+function firstGuideActionDone() {
+  switch (state.experience.intention) {
+    case 'tarefas': return state.tasks.length > 0;
+    case 'hoje': return Object.values(state.habits).some(day => Object.values(day || {}).some(Boolean));
+    case 'foco': return Object.values(state.focusMinutes).some(value => Number(value) > 0);
+    case 'biblioteca': return state.learning.length > 0;
+    case 'financas': return state.finance.transactions.length > 0 || state.finance.bills.length > 0 || state.finance.card.purchases.length > 0;
+    case 'autocuidado': return state.care.goals.length > 0;
+    default: return false;
+  }
+}
+
+function openGuideAction() {
+  const route = state.experience.intention;
+  if (route === 'tarefas') { setRoute('tarefas'); openTaskEditor(); }
+  else if (route === 'hoje') { setRoute('hoje'); $('#habits-list input')?.focus(); }
+  else if (route === 'foco') { setRoute('foco'); $('#timer-start')?.focus(); }
+  else if (route === 'biblioteca') { setRoute('biblioteca'); openLearningEditor(); }
+  else if (route === 'financas') setRoute('financas');
+  else if (route === 'autocuidado') { setRoute('autocuidado'); $('#care-new-goal')?.focus(); }
+}
+
+function renderGuide() {
+  const panel = $('#home-guide');
+  panel.hidden = !state.experience.configured || state.experience.guideDismissed;
+  if (panel.hidden) return;
+  const intention = START_INTENTIONS.find(item => item.id === state.experience.intention) || START_INTENTIONS[0];
+  const steps = [
+    { done: true, text: 'Seu espaço está pronto', action: '' },
+    { done: firstGuideActionDone(), text: intention.action, action: 'first' },
+    { done: state.experience.visitedToday, text: 'Conhecer a página Hoje', action: 'today' }
+  ];
+  const done = steps.filter(step => step.done).length;
+  $('#guide-progress').textContent = done === steps.length ? 'Você já conhece o essencial. O resto aparece conforme precisar.' : `${done} de ${steps.length} passos · sem prazo e sem cobrança.`;
+  $('#guide-steps').innerHTML = steps.map(step => `<li class="${step.done ? 'is-done' : ''}"><span aria-hidden="true">${step.done ? '✓' : '○'}</span><strong>${escapeHTML(step.text)}</strong>${!step.done ? `<button type="button" data-guide="${step.action}">Começar →</button>` : ''}</li>`).join('');
+  $$('[data-guide="first"]', panel).forEach(button => button.onclick = openGuideAction);
+  $$('[data-guide="today"]', panel).forEach(button => button.onclick = () => setRoute('hoje'));
+  $('#guide-dismiss').textContent = done === steps.length ? 'Concluir guia' : 'Dispensar guia';
+}
+
+function renderScenePickers() {
+  for (const [selector, selected, handler] of [
+    ['#scene-picker', state.experience.scene, id => { state.experience.scene = id; save(); renderHomeScene(); renderScenePickers(); }],
+    ['#welcome-scene-picker', welcomeDraft.scene, id => { welcomeDraft.scene = id; renderWelcomePreview(); renderScenePickers(); }]
+  ]) {
+    const target = $(selector);
+    target.innerHTML = HOME_SCENES.map(scene => `<button type="button" class="scene-choice" data-scene="${scene.id}" aria-pressed="${scene.id === selected}"><img src="${bannerPath(scene.id)}" alt="" loading="lazy" /><strong>${escapeHTML(scene.label)}</strong><small>${escapeHTML(scene.detail)}</small></button>`).join('');
+    $$('[data-scene]', target).forEach(button => button.onclick = () => handler(button.dataset.scene));
+  }
+}
+
+let welcomeDraft = { scene: 'library', intention: 'tarefas' };
+function renderWelcomePreview() {
+  $('#welcome-preview-image').src = bannerPath(welcomeDraft.scene);
+  $('#welcome-preview-name').textContent = profileName() ? `${greetingForNow()}, ${profileName()}.` : 'Bem-vindo.';
+  $('#welcome-intentions').innerHTML = START_INTENTIONS.map(item => `<button type="button" data-intention="${item.id}" aria-pressed="${item.id === welcomeDraft.intention}">${escapeHTML(item.label)}</button>`).join('');
+  $$('[data-intention]').forEach(button => button.onclick = () => { welcomeDraft.intention = button.dataset.intention; renderWelcomePreview(); button.focus(); });
+}
+function openWelcomeStudio() {
+  welcomeDraft = { scene: state.experience.scene, intention: state.experience.intention };
+  renderWelcomePreview(); renderScenePickers();
+  $('#welcome-dialog').showModal();
+}
+function bindExperience() {
+  $('#scene-open-today').onclick = () => setRoute('hoje');
+  $('#scene-edit').onclick = () => { setRoute('personalizar'); $('#scene-picker').scrollIntoView({ block: 'center', behavior: state.settings.reducedMotion ? 'instant' : 'smooth' }); };
+  $('#replay-welcome').onclick = openWelcomeStudio;
+  $('#reopen-guide').onclick = () => { state.experience.guideDismissed = false; save(); renderGuide(); setRoute('inicio'); $('#home-guide').scrollIntoView({ block: 'center' }); };
+  $('#guide-dismiss').onclick = () => { state.experience.guideDismissed = true; save(); renderGuide(); };
+  const close = () => $('#welcome-dialog').close();
+  $('#welcome-close').onclick = close;
+  $('#welcome-skip').onclick = () => { state.experience.configured = true; state.experience.guideDismissed = true; save(); close(); renderAll(); };
+  $('#welcome-form').onsubmit = event => {
+    event.preventDefault();
+    state.experience.scene = welcomeDraft.scene;
+    state.experience.intention = welcomeDraft.intention;
+    state.experience.configured = true;
+    state.experience.guideDismissed = false;
+    if (!save()) return;
+    close(); setRoute('inicio'); renderAll();
+    setTimeout(() => { window.scrollTo(0, 0); $('#main-content').focus({ preventScroll: true }); }, 0);
+  };
+  $('#welcome-dialog').addEventListener('close', () => {
+    if (state.experience.configured) return;
+    state.experience.configured = true;
+    state.experience.guideDismissed = true;
+    save(); renderAll();
+  });
+  renderScenePickers();
 }
 
 function applyTheme() {
@@ -766,13 +892,14 @@ function applyTheme() {
   root.dataset.density = state.settings.density === 'compact' ? 'compact' : 'comfortable';
   root.dataset.fontScale = ['small', 'large'].includes(state.settings.fontScale) ? state.settings.fontScale : 'medium';
   root.dataset.reducedMotion = state.settings.reducedMotion ? 'true' : 'false';
+  root.dataset.homeScene = state.settings.showHomeScene === false ? 'false' : 'true';
   $('meta[name="theme-color"]').setAttribute('content', theme === 'dark' ? '#161b19' : '#f5f4ef');
   $('#theme-icon').innerHTML = icon(theme === 'dark' ? 'sun' : 'moon');
   $('#theme-toggle').setAttribute('aria-label', theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro');
   $('#theme-toggle').setAttribute('title', theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro');
   const newsCard = $('#home-news-card') || $('#inicio .news-card');
   if (newsCard) newsCard.hidden = state.settings.showNews === false;
-  if ($('#home-studies')) $('#home-studies').hidden = state.settings.showHomeStudies === false;
+  if ($('#home-studies')) $('#home-studies').hidden = state.settings.showHomeStudies === false || !state.learning.some(item => !item.total || item.current < item.total);
 }
 
 function completedHabitCount() { return activeHabits().filter(habit => todayHabits()[habit.id]).length; }
@@ -846,6 +973,7 @@ function getNextTask() { return actionableTasks()[0] || null; }
 
 function renderPriorities() {
   const candidates = actionableTasks().filter(task => task.id !== getNextTask()?.id).slice(0, 3);
+  $('#inicio .priorities-card').hidden = !candidates.length;
   $('#priority-list').innerHTML = candidates.length ? candidates.map(task => `
     <div class="priority-item"><input class="priority-checkbox" type="checkbox" aria-label="Concluir ${escapeHTML(task.title)}" data-priority-task="${escapeHTML(task.id)}" ${task.status === 'done' ? 'checked' : ''} />
       <div class="priority-copy"><strong>${escapeHTML(task.title)}</strong><span>${task.status === 'doing' ? 'em andamento' : 'próxima ação'} · ${task.area === 'work' ? 'trabalho' : 'pessoal'}</span></div>
@@ -875,7 +1003,7 @@ function formatTaskDate(date) {
 function filteredTasks() {
   const area = $('#task-filter').value, period = $('#task-period').value;
   return state.tasks.filter(task => (area === 'all' || task.area === area)
-    && matchesSearch(`${task.title} ${task.note}`, $('#task-search').value)
+    && matchesSearch(`${task.title} ${task.note} ${task.description}`, $('#task-search').value)
     && ($('#task-show-done').checked || task.status !== 'done')
     && (period === 'all' || (period === 'actionable' ? actionableTasks([task]).length > 0 : period === 'undated' ? !task.date : task.date && task.date <= DATE_KEY)));
 }
@@ -892,6 +1020,7 @@ function openTaskEditor(task = null) {
   $('#task-id-input').value = task?.id || '';
   $('#task-title-input').value = task?.title || '';
   $('#task-note-input').value = task?.note || '';
+  $('#task-description-input').value = task?.description || '';
   $('#task-date-input').value = task ? task.date : DATE_KEY;
   $('#task-area-input').value = task?.area || 'personal';
   $('#task-priority-input').value = task?.priority || 'medium';
@@ -909,7 +1038,7 @@ function renderPlanner() {
   $('#planner-list').innerHTML = tasks.length ? tasks.map(task => `
     <div class="planner-item ${task.status === 'done' ? 'done' : ''}">
       <input class="planner-check" type="checkbox" aria-label="Concluir tarefa: ${escapeHTML(task.title)}" data-planner-task="${escapeHTML(task.id)}" ${task.status === 'done' ? 'checked' : ''}/>
-      <div class="planner-copy"><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button><p>${escapeHTML(task.note || STATUS[task.status])}</p></div>
+      <div class="planner-copy"><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button><p>${escapeHTML(task.description || task.note || STATUS[task.status])}</p></div>
       <div><span class="badge ${task.priority}">${priorityLabel(task.priority)}</span><span class="task-date">${formatTaskDate(task.date)}</span></div>
     </div>`).join('') : '<p class="updates-empty">Nenhuma tarefa nesta área. Capture a primeira.</p>';
   renderTaskView(); bindTaskEditors();
@@ -948,7 +1077,7 @@ function renderKanban() {
     zone.innerHTML = tasks.length ? tasks.map(task => {
       const index = flow.indexOf(status); const left = index > 0 ? flow[index - 1] : null; const right = index < flow.length - 1 ? flow[index + 1] : null;
       if (status === 'done') return `<article class="kanban-card completed-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="completed-mark">✓ Concluída</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4><button class="text-button" data-move="${escapeHTML(task.id)}" data-to="next">Reabrir</button></article>`;
-      return `<article class="kanban-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="badge ${task.area}">${task.area === 'work' ? 'Trabalho' : 'Pessoal'}</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4>${task.note ? `<p>${escapeHTML(task.note)}</p>` : ''}<div class="kanban-meta"><span class="badge ${task.priority}">${priorityLabel(task.priority)}</span><span class="task-date">${formatTaskDate(task.date)}</span></div><div class="kanban-actions">${left ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${left}">← ${STATUS[left]}</button>` : ''}${right ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${right}">${STATUS[right]} →</button>` : ''}</div></article>`;
+      return `<article class="kanban-card" draggable="true" data-task-id="${escapeHTML(task.id)}"><span class="badge ${task.area}">${task.area === 'work' ? 'Trabalho' : 'Pessoal'}</span><h4><button class="task-title-button" data-edit-task="${escapeHTML(task.id)}">${escapeHTML(task.title)}</button></h4>${task.description ? `<p>${escapeHTML(task.description)}</p>` : ''}${task.note ? `<small class="kanban-next">Próxima ação: ${escapeHTML(task.note)}</small>` : ''}<div class="kanban-meta"><span class="badge ${task.priority}">${priorityLabel(task.priority)}</span><span class="task-date">${formatTaskDate(task.date)}</span></div><div class="kanban-actions">${left ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${left}">← ${STATUS[left]}</button>` : ''}${right ? `<button class="move-button" data-move="${escapeHTML(task.id)}" data-to="${right}">${STATUS[right]} →</button>` : ''}</div></article>`;
     }).join('') : '<p class="empty-column">Nenhuma tarefa aqui</p>';
     if (status !== 'done') zone.insertAdjacentHTML('beforeend', `<button class="column-add" data-add-in-column="${status}">+ Adicionar tarefa</button>`);
   });
@@ -1004,6 +1133,7 @@ function openLearningEditor(item) {
 }
 function renderHomeStudies() {
   const items = state.learning.filter(item => !item.total || item.current < item.total).slice(0, 2);
+  $('#home-studies').hidden = state.settings.showHomeStudies === false || !items.length;
   $('#home-study-list').innerHTML = items.length ? items.map(item => `<button class="home-study-item" data-open-study="${escapeHTML(item.id)}"><span>${item.type === 'course' ? 'Curso' : 'Leitura'}</span><strong>${escapeHTML(item.title)}</strong><small>${progress(item.current, item.total)}% · continuar →</small></button>`).join('') : '<p class="updates-empty">Separe um livro ou curso para continuar no seu ritmo.</p>';
   $$('[data-open-study]').forEach(button => button.onclick = () => {
     activeLibrary = 'all'; activeLearningCategory = 'all'; learningSearch = ''; learningStatus = 'all';
@@ -1164,10 +1294,12 @@ function renderQuote() {
 }
 
 function renderPreferences() {
-  $$('[data-accent]').forEach(button => button.classList.toggle('active', button.dataset.accent === state.settings.accent));
-  $$('[data-density]').forEach(button => button.classList.toggle('active', button.dataset.density === state.settings.density));
-  $$('[data-font-scale]').forEach(button => button.classList.toggle('active', button.dataset.fontScale === state.settings.fontScale));
+  renderScenePickers();
+  $$('button[data-accent]').forEach(button => button.classList.toggle('active', button.dataset.accent === state.settings.accent));
+  $$('button[data-density]').forEach(button => button.classList.toggle('active', button.dataset.density === state.settings.density));
+  $$('button[data-font-scale]').forEach(button => button.classList.toggle('active', button.dataset.fontScale === state.settings.fontScale));
   $('#toggle-home-news').checked = state.settings.showNews !== false;
+  $('#toggle-home-scene').checked = state.settings.showHomeScene !== false;
   $('#toggle-reduced-motion').checked = Boolean(state.settings.reducedMotion);
   $('#toggle-home-studies').checked = state.settings.showHomeStudies !== false;
   for (const key of ['surface', 'fontFamily', 'contentWidth', 'startPage']) $(`[data-preference="${key}"]`).value = state.settings[key] || defaultState.settings[key];
@@ -1641,7 +1773,7 @@ function updateCarePauseTimer() {
 }
 
 function renderAll() {
-  applyTheme(); renderDate(); renderProfile(); renderCycles(); renderHabits(); renderJournalAndCheckin(); renderPriorities(); renderUpdates(); renderPlanner(); renderKanban(); renderFinance(); renderCare(); renderLearning(); renderVision(); renderNotes(); renderQuote(); renderPreferences(); renderHistoryPreview(); renderHistory(); updateSummary(); bindFocus(); updateTimerDisplay();
+  applyTheme(); renderDate(); renderProfile(); renderCycles(); renderHabits(); renderJournalAndCheckin(); renderPriorities(); renderUpdates(); renderPlanner(); renderKanban(); renderFinance(); renderCare(); renderLearning(); renderVision(); renderNotes(); renderQuote(); renderPreferences(); renderHistoryPreview(); renderHistory(); updateSummary(); renderHomeScene(); renderGuide(); bindFocus(); updateTimerDisplay();
 }
 
 function setRoute(route) {
@@ -1651,6 +1783,10 @@ function setRoute(route) {
   }
   const view = $(`#${route}`);
   if (!view || !view.classList.contains('view')) return;
+  if (route === 'hoje' && state.experience.configured && !state.experience.visitedToday) {
+    state.experience.visitedToday = true;
+    save(); renderGuide();
+  }
   $$('.view').forEach(item => item.classList.toggle('active', item === view));
   $$('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.route === route));
   $$('.nav-item').forEach(item => {
@@ -2221,7 +2357,7 @@ function bindDialogs() {
     if (!title) { $('#task-title-input').focus(); return; }
     const status = $('#task-status-input').value;
     if (status === 'doing' && state.tasks.filter(task => task.status === 'doing' && task.id !== id).length >= WIP_LIMIT) { showToast('Finalize uma das duas tarefas em andamento antes de iniciar outra.'); return; }
-    const task = normalizeTask({ id: id || makeId(), title, area: $('#task-area-input').value, priority: $('#task-priority-input').value, status, date: $('#task-date-input').value, note: $('#task-note-input').value.trim() });
+    const task = normalizeTask({ id: id || makeId(), title, area: $('#task-area-input').value, priority: $('#task-priority-input').value, status, date: $('#task-date-input').value, note: $('#task-note-input').value.trim(), description: $('#task-description-input').value.trim() });
     if (existing) Object.assign(existing, task); else state.tasks.unshift(task);
     if (!save()) return;
     if (!existing) { $('#task-search').value = ''; $('#task-filter').value = 'all'; $('#task-period').value = 'all'; $('#task-show-done').checked = true; }
@@ -2381,6 +2517,7 @@ function bindDialogs() {
   profileDialog.addEventListener('cancel', event => { if (!profileName()) event.preventDefault(); });
   $('#profile-form').onsubmit = event => {
     event.preventDefault();
+    const newProfile = !profileName();
     const name = $('#profile-name-input').value.trim().replace(/\s+/g, ' ');
     if (!name) { $('#profile-name-input').focus(); return; }
     state.profile.name = name.slice(0, 48);
@@ -2388,6 +2525,7 @@ function bindDialogs() {
     state.profile.photo = profilePhotoDraft;
     if (!save()) return;
     profileDialog.close(); renderAll(); showToast(`Tudo certo, ${state.profile.name}.`);
+    if (newProfile && !state.experience.configured) openWelcomeStudio();
   };
   if (!profileName()) openProfile();
 }
@@ -2468,15 +2606,16 @@ function bindApp() {
   $('#notes-search').oninput = event => { notesSearch = event.target.value; renderNotes(); };
   $('#notes-category-filter').onchange = event => { notesCategory = event.target.value; renderNotes(); };
   const updatePreference = (key, value) => { state.settings[key] = value; save(); applyTheme(); renderPreferences(); };
-  $$('[data-accent]').forEach(button => button.onclick = () => updatePreference('accent', button.dataset.accent));
-  $$('[data-density]').forEach(button => button.onclick = () => updatePreference('density', button.dataset.density));
-  $$('[data-font-scale]').forEach(button => button.onclick = () => updatePreference('fontScale', button.dataset.fontScale));
+  $$('button[data-accent]').forEach(button => button.onclick = () => updatePreference('accent', button.dataset.accent));
+  $$('button[data-density]').forEach(button => button.onclick = () => updatePreference('density', button.dataset.density));
+  $$('button[data-font-scale]').forEach(button => button.onclick = () => updatePreference('fontScale', button.dataset.fontScale));
   $('#toggle-home-news').onchange = event => updatePreference('showNews', event.target.checked);
+  $('#toggle-home-scene').onchange = event => updatePreference('showHomeScene', event.target.checked);
   $('#toggle-reduced-motion').onchange = event => updatePreference('reducedMotion', event.target.checked);
   $('#toggle-home-studies').onchange = event => updatePreference('showHomeStudies', event.target.checked);
   $$('[data-preference]').forEach(select => select.onchange = event => updatePreference(select.dataset.preference, event.target.value));
   $('#next-quote').onclick = () => { state.settings.quoteOffset = Number(state.settings.quoteOffset || 0) + 1; save(); renderQuote(); };
-  bindDialogs(); bindFinance(); bindCare(); bindStorage(); bindSyncConflict(); bindDesktopUpdates(); bindUX();
+  bindDialogs(); bindFinance(); bindCare(); bindStorage(); bindSyncConflict(); bindDesktopUpdates(); bindUX(); bindExperience();
   const routeFromHash = () => {
     const route = window.location.hash.slice(1);
     if (/^[a-z]+$/.test(route)) setRoute(route);
